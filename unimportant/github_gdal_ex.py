@@ -1,3 +1,5 @@
+#This file is a copy paste from stackoverflow. We might be able to get some ideas from it.
+
 from osgeo import gdal
 import os
 
