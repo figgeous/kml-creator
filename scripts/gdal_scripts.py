@@ -58,7 +58,7 @@ def gdal_run_invdist(
         algorithm=algorithm_str,
         outputType=output_type,)
     
-    output_tif_name += f"-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
+    output_tif_name += f"-invdist-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
     print("Running interpolation on: "+src_ds)
