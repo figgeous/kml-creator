@@ -70,7 +70,7 @@ def gdal_run_invdist(
 def plot_raster(*,tif_name:str) -> None:
     import numpy as np
     import matplotlib.pyplot as plt
-    dataset = gdal_open_tif(tif_name=main_name)
+    dataset = gdal_open_tif(tif_name=tif_name)
     # Allocate our array using the first band's datatype
     image_datatype = dataset.GetRasterBand(1).DataType
 
