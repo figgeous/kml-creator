@@ -39,7 +39,7 @@ def gdal_run_invdist(
     max_points:int=0,
     min_points:int=0,
     nodata:float=None,
-    ):
+    ) -> str:
     assert ".shp.zip" not in input_shp_name
     assert ".tif" not in output_tif_name
     
@@ -57,6 +57,8 @@ def gdal_run_invdist(
         zfield=target_column,
         algorithm=algorithm_str,
         outputType=output_type,)
+    
+    output_tif_name += f"-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
     print("Running interpolation on: "+src_ds)
@@ -66,6 +68,7 @@ def gdal_run_invdist(
         srcDS=src_ds,
         options=grid_options)
     idw = None
+    return output_tif_name
     
 def plot_raster(*,tif_name:str) -> None:
     import numpy as np
@@ -80,9 +83,8 @@ def plot_raster(*,tif_name:str) -> None:
     for b in range(dataset.RasterCount):
         # Remember, GDAL index is on 1, but Python is on 0 -- so we add 1 for our GDAL calls
         band = dataset.GetRasterBand(b + 1)
-        print(band)
         # Read in the band's data into the third dimension of our array
         image[:, :, b] = band.ReadAsArray()
 
-    plt.imshow(image[:, :, 0],)
+    plt.imshow(image[:, :, 0], origin='lower')
     plt.colorbar()
