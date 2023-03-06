@@ -34,6 +34,7 @@ def gdal_run_invdist(
     output_format:str="Gtiff",
     output_type="Byte",
     width:int=0, height:int=0,
+    output_res:list = None,
     outputBounds:list = None,
     algorithm:str="invdist",
     power:int=1,
@@ -68,7 +69,7 @@ def gdal_run_invdist(
     if width != 0 or height != 0:
         new_options += ['-outsize', str(width), str(height)]
     if outputBounds is not None:
-        new_options += ['-txe',outputBounds[0], outputBounds[2], '-tye', outputBounds[1], outputBounds[3]]
+        new_options += ['-txe','%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%.18g' % outputBounds[1], '%.18g' % outputBounds[3]]
     # Maybe include outputSRS later?
     # if outputSRS is not None:
     #     new_options += ['-a_srs', str(outputSRS)]
@@ -79,6 +80,8 @@ def gdal_run_invdist(
     #Maybe include spatFilter later?
     # if spatFilter is not None:
     #     new_options += ['-spat', str(spatFilter[0]), str(spatFilter[1]), str(spatFilter[2]), str(spatFilter[3])]
+    if output_res is not None:
+        new_options += ['-tr', str(output_res[0]), str(output_res[1])]
     print("Options: ",new_options)
     
     grid_options = gdal.GridOptions(
