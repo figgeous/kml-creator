@@ -26,11 +26,16 @@ def gdal_open_shp(*,shp_name:str):
 
 def gdal_run_invdist(
     *,
+    # For gdal_grid
     input_shp_name:str,
     target_column:str,
     output_tif_name:str,
+    # Below are associated with GdalOptions
     output_format:str="Gtiff",
-    output_type=gdalconst.GDT_Int16,
+    output_type="Byte",
+    width:int=0, height:int=0,
+    outputBounds:list = None,
+    algorithm:str="invdist",
     power:int=1,
     smoothing:float=None,
     radius1:float=None,
@@ -43,24 +48,47 @@ def gdal_run_invdist(
     assert ".shp.zip" not in input_shp_name
     assert ".tif" not in output_tif_name
     
-    algorithm_str = f"invdist:power={power}"
-    algorithm_str += f":smoothing={smoothing}" if smoothing else ""
-    algorithm_str += f":radius1={radius1}" if radius1 else ""
-    algorithm_str += f":radius2={radius2}" if radius2 else ""
-    algorithm_str += f":angle={angle}" if angle else ""
-    algorithm_str += f":max_points={max_points}" if max_points else ""
-    algorithm_str += f":min_points={min_points}" if min_points else ""
-    algorithm_str += f":nodata={nodata}" if nodata else ""
+    def _get_algorithm_str() -> str:
+        s = f"invdist:power={power}" if power else ""
+        s += f":smoothing={smoothing}" if smoothing else ""
+        s += f":radius1={radius1}" if radius1 else ""
+        s += f":radius2={radius2}" if radius2 else ""
+        s += f":angle={angle}" if angle else ""
+        s += f":max_points={max_points}" if max_points else ""
+        s += f":min_points={min_points}" if min_points else ""
+        s += f":nodata={nodata}" if nodata else ""
+        return s
+    
+    # Not implemented settings include: creationOptions, layers, SQLStatement, z_increase, z_multiply
+    new_options = []
+    if output_format is not None:
+        new_options += ['-of', output_format]
+    if output_type is not None:
+        new_options += ['-ot', output_type]
+    if width != 0 or height != 0:
+        new_options += ['-outsize', str(width), str(height)]
+    if outputBounds is not None:
+        new_options += ['-txe',outputBounds[0], outputBounds[2], '-tye', outputBounds[1], outputBounds[3]]
+    # Maybe include outputSRS later?
+    # if outputSRS is not None:
+    #     new_options += ['-a_srs', str(outputSRS)]
+    if algorithm is not None:
+        new_options += ['-a', _get_algorithm_str()]
+    if target_column is not None:
+        new_options += ['-zfield', target_column]
+    #Maybe include spatFilter later?
+    # if spatFilter is not None:
+    #     new_options += ['-spat', str(spatFilter[0]), str(spatFilter[1]), str(spatFilter[2]), str(spatFilter[3])]
+    print("Options: ",new_options)
     
     grid_options = gdal.GridOptions(
-        format=output_format,
-        zfield=target_column,
-        algorithm=algorithm_str,
-        outputType=output_type,)
-    
+        options=new_options
+    ) 
+
     output_tif_name += f"-invdist-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
+    
     print("Running interpolation on: "+src_ds)
     print("Saving to: "+dest_name)
     idw = gdal.Grid(
