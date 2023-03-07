@@ -24,7 +24,7 @@ def gdal_open_shp(*,shp_name:str):
     assert ".shp.zip" not in shp_name
     return ogr.Open(SHP_PATH+shp_name+".shp.zip")
 
-def gdal_run_invdist(
+def gdal_run_interpolation(
     *,
     # For gdal_grid
     input_shp_name:str,
@@ -46,18 +46,50 @@ def gdal_run_invdist(
     min_points:int=0,
     nodata:float=None,
     ) -> str:
+    """
+    Keyword arguments are :
+        input_shp_name --- 
+        target_column --- 
+        output_tif_name --- 
+        output_format --- output format ("GTiff", etc...)
+        output_type --- output type (gdalconst.GDT_Byte, etc...)
+        width --- width of the output raster in pixel
+        height --- height of the output raster in pixel
+        output_res --- resolution of output file
+        outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
+
+        #Related to algorithm
+        algorithm --- algorithm to use, e.g. "invdist", "nearest", "average", "linear"
+        power --- power used by algorithm
+        smoothing --- smoothing used by algorithm
+        radius1 --- 
+        radius2 ---
+        angle ---
+        max_points --- 
+        min_points ---
+        no_data ---
+
+        #Not implemented:
+        outputSRS --- assigned output SRS
+        layers --- list of layers to convert
+        spatFilter --- spatial filter as (minX, minY, maxX, maxY) bounding box
+    """
     assert ".shp.zip" not in input_shp_name
     assert ".tif" not in output_tif_name
     
+    def _get_output_bounds() -> list:
+        return ['%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%.18g' % outputBounds[1], '%.18g' % outputBounds[3]]
+    
     def _get_algorithm_str() -> str:
-        s = f"invdist:power={power}" if power else ""
-        s += f":smoothing={smoothing}" if smoothing else ""
-        s += f":radius1={radius1}" if radius1 else ""
-        s += f":radius2={radius2}" if radius2 else ""
-        s += f":angle={angle}" if angle else ""
-        s += f":max_points={max_points}" if max_points else ""
-        s += f":min_points={min_points}" if min_points else ""
-        s += f":nodata={nodata}" if nodata else ""
+        s = f"{algorithm}:"
+        s += f"power={power}:" if power else ""
+        s += f"smoothing={smoothing}:" if smoothing else ""
+        s += f"radius1={radius1}:" if radius1 else ""
+        s += f"radius2={radius2}:" if radius2 else ""
+        s += f"angle={angle}:" if angle else ""
+        s += f"max_points={max_points}:" if max_points else ""
+        s += f"min_points={min_points}:" if min_points else ""
+        s += f"nodata={nodata}:" if nodata else ""
         return s
     
     # Not implemented settings include: creationOptions, layers, SQLStatement, z_increase, z_multiply
@@ -69,7 +101,7 @@ def gdal_run_invdist(
     if width != 0 or height != 0:
         new_options += ['-outsize', str(width), str(height)]
     if outputBounds is not None:
-        new_options += ['-txe','%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%.18g' % outputBounds[1], '%.18g' % outputBounds[3]]
+        new_options += ['-txe']+_get_output_bounds()
     # Maybe include outputSRS later?
     # if outputSRS is not None:
     #     new_options += ['-a_srs', str(outputSRS)]
@@ -88,7 +120,7 @@ def gdal_run_invdist(
         options=new_options
     ) 
 
-    output_tif_name += f"-invdist-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
+    output_tif_name += f"-{algorithm}-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
     
