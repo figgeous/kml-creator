@@ -24,7 +24,7 @@ def gdal_open_shp(*,shp_name:str):
     assert ".shp.zip" not in shp_name
     return ogr.Open(SHP_PATH+shp_name+".shp.zip")
 
-def gdal_run_invdist(
+def gdal_run_interpolation(
     *,
     # For gdal_grid
     input_shp_name:str,
@@ -81,14 +81,15 @@ def gdal_run_invdist(
         return ['%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%.18g' % outputBounds[1], '%.18g' % outputBounds[3]]
     
     def _get_algorithm_str() -> str:
-        s = f"invdist:power={power}" if power else ""
-        s += f":smoothing={smoothing}" if smoothing else ""
-        s += f":radius1={radius1}" if radius1 else ""
-        s += f":radius2={radius2}" if radius2 else ""
-        s += f":angle={angle}" if angle else ""
-        s += f":max_points={max_points}" if max_points else ""
-        s += f":min_points={min_points}" if min_points else ""
-        s += f":nodata={nodata}" if nodata else ""
+        s = f"{algorithm}:"
+        s += f"power={power}:" if power else ""
+        s += f"smoothing={smoothing}:" if smoothing else ""
+        s += f"radius1={radius1}:" if radius1 else ""
+        s += f"radius2={radius2}:" if radius2 else ""
+        s += f"angle={angle}:" if angle else ""
+        s += f"max_points={max_points}:" if max_points else ""
+        s += f"min_points={min_points}:" if min_points else ""
+        s += f"nodata={nodata}:" if nodata else ""
         return s
     
     # Not implemented settings include: creationOptions, layers, SQLStatement, z_increase, z_multiply
@@ -119,7 +120,7 @@ def gdal_run_invdist(
         options=new_options
     ) 
 
-    output_tif_name += f"-invdist-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
+    output_tif_name += f"-{algorithm}-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
     
