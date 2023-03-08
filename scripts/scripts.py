@@ -10,11 +10,14 @@ def grid_to_coordinate(*, grid_df:pd.DataFrame, target_column:str) -> pd.DataFra
     return melt
 
 def dataframe_to_shp(*, input_df, output_file_path:str=None):
+    """
+    Use this instead of Qgis.
+    """
     import geopandas
     from shapely.geometry import Point
     # combine lat and lon column to a shapely Point() object
     input_df['geometry'] = input_df.apply(lambda x: Point((float(x.lon), float(x.lat))), axis=1)
-    gpdf = geopandas.GeoDataFrame(input_df, geometry='geometry')
+    gpdf = geopandas.GeoDataFrame(input_df, geometry='geometry', crs="EPSG:4326")
     if output_file_path:
         assert ".shp.zip" not in output_file_path
         gpdf.to_file(SHP_PATH+output_file_path+'.shp.zip', driver='ESRI Shapefile')

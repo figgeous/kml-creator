@@ -37,7 +37,7 @@ def gdal_run_interpolation(
     output_res:list = None,
     outputBounds:list = None,
     algorithm:str="invdist",
-    power:int=1,
+    power:int=None,
     smoothing:float=None,
     radius1:float=None,
     radius2:float=None,
@@ -78,7 +78,7 @@ def gdal_run_interpolation(
     assert ".tif" not in output_tif_name
     
     def _get_output_bounds() -> list:
-        return ['%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%.18g' % outputBounds[1], '%.18g' % outputBounds[3]]
+        return ['%.18g' % outputBounds[0], '%.18g' % outputBounds[2], '-tye', '%' % outputBounds[1], '%' % outputBounds[3]]
     
     def _get_algorithm_str() -> str:
         s = f"{algorithm}:"
@@ -151,3 +151,21 @@ def plot_raster(*,tif_name:str) -> None:
 
     plt.imshow(image[:, :, 0], origin='lower')
     plt.colorbar()
+
+def get_tif_array(*,tif_name:str):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    dataset = gdal_open_tif(tif_name=tif_name)
+    # Allocate our array using the first band's datatype
+    image_datatype = dataset.GetRasterBand(1).DataType
+
+    image = np.zeros((dataset.RasterYSize, dataset.RasterXSize, dataset.RasterCount),
+                    dtype=gdal_array.GDALTypeCodeToNumericTypeCode(image_datatype))
+    # Loop over all bands in dataset
+    for b in range(dataset.RasterCount):
+        # Remember, GDAL index is on 1, but Python is on 0 -- so we add 1 for our GDAL calls
+        band = dataset.GetRasterBand(b + 1)
+        # Read in the band's data into the third dimension of our array
+        image[:, :, b] = band.ReadAsArray()
+
+    return image
