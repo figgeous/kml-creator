@@ -36,7 +36,7 @@ def inputToShapefile():
 
     # call the function
     for inputfile in shapefiles:
-        convertShpToRaster(inputfile, band, size)   
+        convertShpToRaster(inputfile, band, size)
 
 inputToShapefile()
 
