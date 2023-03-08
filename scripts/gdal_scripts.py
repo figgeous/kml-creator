@@ -1,5 +1,10 @@
-from osgeo import gdalconst, ogr, gdal, gdal_array
 import os
+
+from osgeo import gdal
+from osgeo import gdal_array
+from osgeo import gdalconst
+from osgeo import ogr
+
 from constants import *
 
 

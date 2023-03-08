@@ -1,7 +1,7 @@
 # This file is a copy paste from stackoverflow. We might be able to get some ideas from it.
+import os
 
 from osgeo import gdal
-import os
 
 shapefiles = [folder + "/" + file for file in os.listdir(folder) if "shp" in file]
 output = "output"
