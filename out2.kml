@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document id="root_doc">
+<Schema name="new.shp" id="new.shp">
+	<SimpleField name="DN" type="float"></SimpleField>
+</Schema>
+<Folder><name>new.shp</name>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#new.shp">
+		<SimpleData name="DN">100.000000000000000</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>9.066182624125,56.83480888 9.066182624125,56.8348390096875 9.0662165824375,56.8348570875 9.066273179625,56.8348570875 9.0663071379375,56.8348390096875 9.0663071379375,56.83480888 9.066182624125,56.83480888</coordinates></LinearRing></outerBoundaryIs></Polygon></MultiGeometry>
+  </Placemark>
+  <Placemark>
+	<Style><LineStyle><color>ff0000ff</color></LineStyle><PolyStyle><fill>0</fill></PolyStyle></Style>
+	<ExtendedData><SchemaData schemaUrl="#new.shp">
+		<SimpleData name="DN">100.000000000000000</SimpleData>
+	</SchemaData></ExtendedData>
+      <MultiGeometry><Polygon><outerBoundaryIs><LinearRing><coordinates>9.065843041,56.83480888 9.065843041,56.83519454 9.0664429711875,56.83519454 9.066454290625,56.835182488125 9.066567485,56.8351764621875 9.066567485,56.8351162028125 9.06652220725,56.835134280625 9.066454290625,56.8351282546875 9.0664429711875,56.8351403065625 9.0661486658125,56.8351644103125 9.0661486658125,56.8351162028125 9.066567485,56.8350679953125 9.066567485,56.8350077359375 9.0661486658125,56.8350559434375 9.0661486658125,56.8348751653125 9.066137346375,56.8348751653125 9.0661486658125,56.834869139375 9.066137346375,56.8348570875 9.0661486658125,56.83480888 9.065843041,56.83480888</coordinates></LinearRing></outerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>9.0658769993125,56.8348872171875 9.0658996381875,56.8348872171875 9.0658996381875,56.834893243125 9.0658769993125,56.8348992690625 9.0658769993125,56.8348872171875</coordinates></LinearRing></innerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>9.0658769993125,56.83497760625 9.06588831875,56.83497760625 9.06588831875,56.834989658125 9.0658769993125,56.834989658125 9.0658769993125,56.83497760625</coordinates></LinearRing></innerBoundaryIs><innerBoundaryIs><LinearRing><coordinates>9.0658769993125,56.8350679953125 9.06588831875,56.8350679953125 9.06588831875,56.8350800471875 9.0658769993125,56.8350800471875 9.0658769993125,56.8350679953125</coordinates></LinearRing></innerBoundaryIs></Polygon></MultiGeometry>
+  </Placemark>
+</Folder>
+</Document></kml>
