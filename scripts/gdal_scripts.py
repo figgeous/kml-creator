@@ -4,15 +4,18 @@ from osgeo import gdal
 from osgeo import gdal_array
 from osgeo import gdalconst
 from osgeo import ogr
+from osgeo_utils.gdal_polygonize import gdal_polygonize
 
 from constants import *
 
 
 def gdal_open_tif(*, tif_name: str):
+    assert ".tif" not in tif_name
     return gdal.Open(TIF_PATH + tif_name + ".tif", gdal.GA_ReadOnly)
 
 
 def gdal_print_metadata(*, tif_name: str) -> None:
+    assert ".tif" not in tif_name
     metadata = os.popen("gdalinfo " + TIF_PATH + tif_name + ".tif").read()
     print(metadata)
 
@@ -189,3 +192,31 @@ def get_tif_array(*, tif_name: str):
         image[:, :, b] = band.ReadAsArray()
 
     return image
+
+
+def make_polygons(
+    input_tif: str,
+    input_band: int = 1,
+    output_shp: str = None,
+    output_layer: str = None,
+    output_field: str = None,
+    connectedness8: bool = False,
+    options: str = None,
+) -> None:
+    assert ".tif" not in input_tif
+    assert ".shp" not in output_shp
+
+    input_tif = TIF_PATH + input_tif + ".tif" if input_tif else None
+    output_shp = SHP_PATH + output_shp + ".shp.zip" if output_shp else None
+
+    src_ds = TIF_PATH + "sample.tif"
+    dst_filename = SHP_PATH + "sample.shp.zip"
+    gdal_polygonize(
+        src_filename=input_tif,
+        dst_filename=output_shp,
+        band_number=input_band,
+        dst_layername=output_layer,
+        dst_fieldname=output_field,
+        connectedness8=connectedness8,
+        options=options,
+    )
