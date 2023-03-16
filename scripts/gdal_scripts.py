@@ -120,7 +120,7 @@ def gdal_run_interpolation(
         options=new_options
     ) 
 
-    output_tif_name += f"-{algorithm}-{power}-{smoothing}-{radius1}-{radius2}-{angle}-{max_points}-{min_points}"
+    output_tif_name += f"-{algorithm}-{radius1}-{radius2}"
     dest_name = TIF_PATH+output_tif_name+".tif"
     src_ds = SHP_PATH+input_shp_name+".shp.zip"
     

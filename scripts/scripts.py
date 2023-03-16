@@ -18,6 +18,7 @@ def dataframe_to_shp(*, input_df, output_file_path:str=None):
     if output_file_path:
         assert ".shp.zip" not in output_file_path
         gpdf.to_file(SHP_PATH+output_file_path+'.shp.zip', driver='ESRI Shapefile')
+    gpdf = gpdf.drop(columns=['lat', 'lon'])
     return gpdf
 
 def open_shp(*,file_name:str):
