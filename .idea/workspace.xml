@@ -5,21 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="28c1376e-9a36-4836-9289-afbd8feac402" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/whole_process_only_bm.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/csv_files/only_bm.csv" beforeDir="false" afterPath="$PROJECT_DIR$/csv_files/only_bm.csv" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gdal_polygonize copy.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/gdal_polygonize copy.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/kml_create.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/kml_create.ipynb" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/out75.kml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/gdal_scripts.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/gdal_scripts.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/scripts.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/scripts.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/only_bm.shp.zip" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/only_bm/only_bm.cpg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/only_bm/only_bm.dbf" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/only_bm/only_bm.shp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/only_bm/only_bm.shx" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/test_grid02_full_spread-nearest-1-None-6e-05-3e-05-None-0-0.shp.zip" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shapefiles/test_grid02_full_spread.shp.zip" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/kml_files/placeholder.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -27,11 +15,17 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="add-polygonize" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="HighlightingSettingsPerFile">
     <setting file="file://$USER_HOME$/AppData/Local/JetBrains/PyCharm2022.2/python_stubs/-1888632573/nt.py" root0="SKIP_INSPECTION" />
     <setting file="file://$USER_HOME$/AppData/Local/Programs/Python/Python310/Lib/os.py" root0="SKIP_INSPECTION" />
+    <setting file="file://$PROJECT_DIR$/venv/Lib/site-packages/geopy/distance.py" root0="SKIP_INSPECTION" />
     <setting file="file://$PROJECT_DIR$/venv/Lib/site-packages/osgeo/gdal.py" root0="SKIP_INSPECTION" />
   </component>
   <component name="MarkdownSettingsMigration">
@@ -41,6 +35,7 @@
     <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectId" id="2Mv15tglXiDCMv10O1WXZvGtUnr" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -78,6 +73,7 @@
       <workItem from="1678777860405" duration="12000" />
       <workItem from="1678804941157" duration="16389000" />
       <workItem from="1678950107809" duration="20000" />
+      <workItem from="1679160731348" duration="329000" />
     </task>
     <servers />
   </component>
