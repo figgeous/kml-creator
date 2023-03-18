@@ -36,6 +36,7 @@ def open_csv_as_dataframe(
     print(f"Opened csv from {file_path}. Shape: {df.shape}")
     return df
 
+
 def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
     assert ".shp" not in file_name
     file_path = SHP_PATH + file_name + ".shp.zip"
@@ -44,12 +45,14 @@ def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
     print(f"Opened shapefile from {file_path}")
     return ogr_datasource
 
-def open_shp_with_geopandas(*, file_name:str) -> gp.GeoDataFrame:
+
+def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     assert ".shp" not in file_name
-    file_path = SHP_PATH+file_name+'.shp.zip'
+    file_path = SHP_PATH + file_name + ".shp.zip"
     geo_df = gp.read_file(file_path)
     print(f"Opened shapefile from {file_path}. Shape: {geo_df.shape}")
     return geo_df
+
 
 def open_tif_with_gdal(*, file_name: str) -> gdal.Dataset:
     assert ".tif" not in file_name
@@ -68,16 +71,16 @@ def save_dataframe_to_csv(
     file_path = CSV_PATH + file_name + ".csv"
     return df.to_csv(path_or_buf=file_path, sep=sep)
 
-def save_geodataframe_to_shp(geo_df:gp.GeoDataFrame, file_name:str) -> None:
+
+def save_geodataframe_to_shp(geo_df: gp.GeoDataFrame, file_name: str) -> None:
     assert ".csv" not in file_name
-    file_path = SHP_PATH+file_name+'.shp.zip'
-    geo_df.to_file(filename=file_path, driver='ESRI Shapefile', crs='EPSG:4326')
+    file_path = SHP_PATH + file_name + ".shp.zip"
+    geo_df.to_file(filename=file_path, driver="ESRI Shapefile", crs="EPSG:4326")
     print(f"Saved geo_df to {file_path}")
 
 
 ### Display functions
-def get_distance(
-        coords: tuple[int, int, int, int]) -> float:
+def get_distance(coords: tuple[int, int, int, int]) -> float:
     """
     Calculates the number of metres between coordinate points.
     Must be (lat_1, lon_1, lat_2, lon_2)
@@ -106,9 +109,9 @@ def print_first_feature_of_shp(file):
 
 
 def plot_raster(
-        *,
-        tif_name: str,
-        fig_size: tuple[int, int] = None,
+    *,
+    tif_name: str,
+    fig_size: tuple[int, int] = None,
 ) -> None:
     dataset = open_tif_with_gdal(file_name=tif_name)
     # Allocate our array using the first band's datatype
@@ -129,15 +132,22 @@ def plot_raster(
     plt.imshow(image[:, :, 0], origin="lower")
     plt.colorbar()
 
-def get_geodf_dimensions(geo_df:gp.GeoDataFrame) -> (int, int):
-    min_lon, min_lat, max_lon, max_lat = geo_df.total_bounds[0], geo_df.total_bounds[1], geo_df.total_bounds[2], geo_df.total_bounds[3]
+
+def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> (int, int):
+    min_lon, min_lat, max_lon, max_lat = (
+        geo_df.total_bounds[0],
+        geo_df.total_bounds[1],
+        geo_df.total_bounds[2],
+        geo_df.total_bounds[3],
+    )
     width = get_distance((min_lat, min_lon, min_lat, max_lon))
     height = get_distance((min_lat, min_lon, max_lat, min_lon))
     print(f"geo_df is {round(width)} m in width and {round(height)} m in height")
     return width, height
 
-def rough_coord_diff_to_metres(coord_diff:float):
-    return coord_diff*1000000
+
+def rough_coord_diff_to_metres(coord_diff: float):
+    return coord_diff * 1000000
 
 
 ### Basic data processing
@@ -166,14 +176,16 @@ def dataframe_to_shp(*, input_df, output_file_path: str = None) -> gp.GeoDataFra
     )
     geo_df = gp.GeoDataFrame(input_df, geometry="geometry")
     geo_df = geo_df.reset_index()
-    geo_df = geo_df.drop(columns=['index',"lat", "lon"])
+    geo_df = geo_df.drop(columns=["index", "lat", "lon"])
     if output_file_path:
         assert ".shp.zip" not in output_file_path
-        geo_df.to_file(SHP_PATH + output_file_path + ".shp.zip", driver="ESRI Shapefile")
+        geo_df.to_file(
+            SHP_PATH + output_file_path + ".shp.zip", driver="ESRI Shapefile"
+        )
     return geo_df
 
 
-def add_bin_enum_to_df(df:pd.DataFrame, bins:tuple[Bin], column:str) -> pd.DataFrame:
+def add_bin_enum_to_df(df: pd.DataFrame, bins: tuple[Bin], column: str) -> pd.DataFrame:
     """
     Adds a column to df with a binned version of column. Each row in df that falls
     within bin.lower_bound and bin.upper_bound is given the value bin.enum. The new
@@ -181,23 +193,27 @@ def add_bin_enum_to_df(df:pd.DataFrame, bins:tuple[Bin], column:str) -> pd.DataF
     """
     conditions, categories = [], []
     for bin in bins:
-        conditions.append((df[column] >= bin.lower_bound) & (df[column] < bin.upper_bound))
+        conditions.append(
+            (df[column] >= bin.lower_bound) & (df[column] < bin.upper_bound)
+        )
         categories.append(bin.enum)
-    df[column+"_s"] = np.select(conditions, categories)
+    df[column + "_s"] = np.select(conditions, categories)
     return df
 
 
-def add_square_buffer_to_geo_df(geo_df:gp.GeoDataFrame, size:float=0.00005):
+def add_square_buffer_to_geo_df(geo_df: gp.GeoDataFrame, size: float = 0.00005):
     """
     Adds a column of square polygons with centre at Point. Size in degrees
     """
     # Buffer the points using a square cap style
-    #https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
-    geo_df["buffer"] = geo_df["geometry"].buffer(size, cap_style = 3)
+    # https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
+    geo_df["buffer"] = geo_df["geometry"].buffer(size, cap_style=3)
     return geo_df
 
 
-def shp_of_polygons_to_binned_dict(*, bins:tuple[Bin], shp:object=None, shp_file_name:str=None) -> dict[int, dict[sp.Polygon]]:
+def shp_of_polygons_to_binned_dict(
+    *, bins: tuple[Bin], shp: object = None, shp_file_name: str = None
+) -> dict[int, dict[sp.Polygon]]:
     """
     Use either shp instance or shp_file_name. Creates a dictionary of keys related to
     bin.enum and nested dictionary values containing polygons that fall within each bin.
@@ -206,12 +222,14 @@ def shp_of_polygons_to_binned_dict(*, bins:tuple[Bin], shp:object=None, shp_file
         shp = open_shp_with_geopandas(file_name=shp_file_name)
     polygon_dict = {}
     for bin in bins:
-        polygon_dict[bin.enum] = shp[shp['DN'] == bin.enum]["geometry"].to_dict()
+        polygon_dict[bin.enum] = shp[shp["DN"] == bin.enum]["geometry"].to_dict()
     print("Converted shapefile to binned polygon dictionary")
     return polygon_dict
 
 
-def unite_polygons_to_binned_multipolygon_dict(*, geo_df:gp.GeoDataFrame, grouping_col:str, bins:tuple[Bin]) -> dict[str,sp.MultiPolygon]:
+def unite_polygons_to_binned_multipolygon_dict(
+    *, geo_df: gp.GeoDataFrame, grouping_col: str, bins: tuple[Bin]
+) -> dict[str, sp.MultiPolygon]:
     """
     Takes a geo_df containing polygons, unites any overlapping polygons and groups the
     resulting multipolygons into a binned dict.
@@ -219,8 +237,14 @@ def unite_polygons_to_binned_multipolygon_dict(*, geo_df:gp.GeoDataFrame, groupi
     multipolygon_dict = dict()
     for bin in bins:
         column = geo_df[geo_df[grouping_col] == bin.enum]["buffer"]
-        multipolygon_dict[bin.enum] = sp.unary_union(geo_df[geo_df[grouping_col] == bin.enum]["buffer"])
-        print("Bin {}: uniting {} polygons to {} polygons".format(bin.enum, len(column), len(multipolygon_dict[bin.enum].geoms)))
+        multipolygon_dict[bin.enum] = sp.unary_union(
+            geo_df[geo_df[grouping_col] == bin.enum]["buffer"]
+        )
+        print(
+            "Bin {}: uniting {} polygons to {} polygons".format(
+                bin.enum, len(column), len(multipolygon_dict[bin.enum].geoms)
+            )
+        )
     return multipolygon_dict
 
 
@@ -261,17 +285,19 @@ def run_polygonize(
 
 ### KML creation
 
-def _save_kml(kml:simplekml.Kml, file_name:str):
-    file_path = KML_PATH+file_name+".kml"
+
+def _save_kml(kml: simplekml.Kml, file_name: str):
+    file_path = KML_PATH + file_name + ".kml"
     kml.save(file_path)
-    print("Saved kml file to "+file_path)
+    print("Saved kml file to " + file_path)
+
 
 def make_kml_from_geo_df(
-        file_name:str,
-        bins:tuple[Bin],
-        geo_df:gp.GeoDataFrame = None,
-        grouping_col:str = None,
-        ) -> None:
+    file_name: str,
+    bins: tuple[Bin],
+    geo_df: gp.GeoDataFrame = None,
+    grouping_col: str = None,
+) -> None:
     """
     Takes all polygons in a geo_df and writes them into a kml file
     """
@@ -289,7 +315,10 @@ def make_kml_from_geo_df(
             pol.style.polystyle.outline = 0
     _save_kml(kml=kml, file_name=file_name)
 
-def make_kml_from_one_multipolygon(file_name:str, multi_poly:sp.MultiPolygon, bin:Bin) -> None:
+
+def make_kml_from_one_multipolygon(
+    file_name: str, multi_poly: sp.MultiPolygon, bin: Bin
+) -> None:
     assert ".kml" not in file_name
     kml = simplekml.Kml()
     multipolodd = kml.newmultigeometry(name="MultiPoly")
@@ -300,16 +329,17 @@ def make_kml_from_one_multipolygon(file_name:str, multi_poly:sp.MultiPolygon, bi
         )
         pol.style.polystyle.color = bin.colour
         pol.style.polystyle.outline = 0
-    _save_kml(kml=kml,file_name=file_name)
+    _save_kml(kml=kml, file_name=file_name)
 
 
 def make_kml_from_binned_multipolygon_dict(
-        *,
-        binned_multipolygon_dict: dict[str,sp.MultiPolygon],
-        file_name:str,
-        bins:tuple[Bin],
-        ignore_bin:int = None,
-        one_file_per_bin:bool=False) -> None:
+    *,
+    binned_multipolygon_dict: dict[str, sp.MultiPolygon],
+    file_name: str,
+    bins: tuple[Bin],
+    ignore_bin: int = None,
+    one_file_per_bin: bool = False,
+) -> None:
     """
     Use in conjunction with unite_polygons_to_binned_multipolygon_dict()
     """
@@ -317,7 +347,8 @@ def make_kml_from_binned_multipolygon_dict(
     kml = simplekml.Kml()
     multipolodd = kml.newmultigeometry(name="MultiPoly")
     for bin in bins:
-        if bin.enum == ignore_bin: continue
+        if bin.enum == ignore_bin:
+            continue
         for polygon in binned_multipolygon_dict[bin.enum].geoms:
             pol = multipolodd.newpolygon(
                 name="polygon",
@@ -326,11 +357,9 @@ def make_kml_from_binned_multipolygon_dict(
             pol.style.polystyle.color = bin.colour
             pol.style.polystyle.outline = 0
         if one_file_per_bin:
-            _save_kml(kml=kml, file_name=file_name+"_bin_"+str(bin.enum))
+            _save_kml(kml=kml, file_name=file_name + "_bin_" + str(bin.enum))
     if not one_file_per_bin:
         _save_kml(kml=kml, file_name=file_name)
-
-
 
 
 ### Algorithm
@@ -456,4 +485,3 @@ def run_interpolation(
     idw = gdal.Grid(destName=dest_name, srcDS=src_ds, options=grid_options)
     idw = None
     return output_tif_name
-
