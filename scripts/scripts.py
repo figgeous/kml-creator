@@ -133,7 +133,7 @@ def plot_raster(
     plt.colorbar()
 
 
-def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> (int, int):
+def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
     min_lon, min_lat, max_lon, max_lat = (
         geo_df.total_bounds[0],
         geo_df.total_bounds[1],
