@@ -155,13 +155,15 @@ def grid_to_coordinate(*, grid_df: pd.DataFrame, target_column: str) -> pd.DataF
     """
     Converts a grid format to a list of values and their coordinates. The grid is
     2 dimensional with latitude on rows and longitude on columns. Lists of items and
-    their coordinates are easier to process.
+    their coordinates are easier to process. Target column is the resulting column
+    name.
     """
+    grid_df = grid_df.reset_index()
     melt = grid_df.melt(
-        id_vars=["lat"], var_name=grid_df.columns[1], value_name=target_column
+        id_vars=["index"], var_name=grid_df.columns[1], value_name=target_column
     )
-    melt = melt.rename(columns={melt.columns[1]: "lon"})
-    melt[["lat"]] = melt[["lat"]].apply(pd.to_numeric)
+    melt.columns = ["lat", "lon", target_column]
+    melt = melt.apply(pd.to_numeric)
     return melt
 
 
