@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import shapely as sp
 import simplekml
+from geopy.point import Point as geopy_Point
 from osgeo import gdal
 from osgeo import gdal_array
 from osgeo import ogr
@@ -54,6 +55,32 @@ def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     return geo_df
 
 
+def open_or_create_and_open_shp_with_geopandas(
+    file_name: str,
+    bins: tuple[Bin],
+    target_col_for_enum: str,
+    make_new_geo_df: bool = False,
+    sep: str = ",",
+) -> tuple[gp.GeoDataFrame, int, int]:
+    make_new_geo_df = False
+    geo_df = None
+    try:
+        geo_df = open_shp_with_geopandas(file_name=file_name)
+    except Exception:
+        print("The GeoDataframe doesn't exist yet. Creating...")
+
+    if make_new_geo_df or geo_df.empty:
+        df = open_csv_as_dataframe(file_name=file_name, sep=sep, index_col=0)
+        df = add_bin_enum_to_df(df=df, bins=bins, column=target_col_for_enum)
+        geo_df = dataframe_to_shp(input_df=df)
+        save_geodataframe_to_shp(
+            geo_df=geo_df,
+            file_name=file_name,
+        )
+    width, height = get_geodf_dimensions(geo_df=geo_df)
+    return geo_df, width, height
+
+
 def open_tif_with_gdal(*, file_name: str) -> gdal.Dataset:
     assert ".tif" not in file_name
     file_path = TIF_PATH + file_name + ".tif"
@@ -79,14 +106,96 @@ def save_geodataframe_to_shp(geo_df: gp.GeoDataFrame, file_name: str) -> None:
     print(f"Saved geo_df to {file_path}")
 
 
-### Display functions
+### Display and measurement functions
+def get_coordinate_a_distance_away(
+    start_coord: tuple[float, float], distance_in_metres: int, bearing: int = 90
+) -> tuple[float, float]:
+    """
+    ::params:: start_coord: Must be (lon, lat)
+    return in (lon, lat) form
+    """
+    # p1 = geopy_Point(longitude=start_coord[0], latitude=start_coord[1])
+    dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
+        (start_coord[1], start_coord[0]), bearing=bearing
+    )
+    return dest_coord[1], dest_coord[0]
+
+
+### Display and measurement functions
+
+
+def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
+    min_lon, min_lat, max_lon, max_lat = (
+        geo_df.total_bounds[0],
+        geo_df.total_bounds[1],
+        geo_df.total_bounds[2],
+        geo_df.total_bounds[3],
+    )
+    width = get_distance((min_lon, min_lat, min_lon, max_lat))
+    height = get_distance((min_lon, min_lat, max_lon, min_lat))
+    print(
+        f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height"
+    )
+
+    coord_x_one_metre_away_at_bottom, _ = get_coordinate_a_distance_away(
+        start_coord=(min_lon, min_lat),
+        distance_in_metres=1,
+        bearing=90,
+    )
+    _, coord_y_one_metre_away_at_bottom = get_coordinate_a_distance_away(
+        start_coord=(min_lon, min_lat),
+        distance_in_metres=1,
+        bearing=0,
+    )
+    distance_for_same_lon_at_top = get_distance(
+        (min_lon, max_lat, coord_x_one_metre_away_at_bottom, max_lat)
+    )
+    distance_for_same_lat_at_right = get_distance(
+        (max_lon, min_lat, max_lon, coord_y_one_metre_away_at_bottom)
+    )
+    print(
+        "1.0 m metre of longitude at the bottom left is {} m at the top left.\n1.0 m metre of latitude at the bottom left is {} m at the bottom right.".format(
+            round(distance_for_same_lon_at_top, 4),
+            round(distance_for_same_lat_at_right, 3),
+        )
+    )
+    return width, height
+
+
 def get_distance(coords: tuple[int, int, int, int]) -> float:
     """
     Calculates the number of metres between coordinate points.
-    Must be (lat_1, lon_1, lat_2, lon_2)
+    Must be (lon_1, lat_1, lon_2, lat_2)
     """
-    distance = geopy.distance.geodesic((coords[0], coords[1]), (coords[2], coords[3])).m
-    return distance
+    p1 = geopy_Point(longitude=coords[0], latitude=coords[1])
+    p2 = geopy_Point(longitude=coords[2], latitude=coords[3])
+    return geopy.distance.geodesic(p1, p2).m
+
+
+def get_coordinate_a_distance_away(
+    start_coord: tuple[float, float], distance_in_metres: int, bearing: int = 90
+) -> tuple[float, float]:
+    """
+    Must be (lon, lat)
+    """
+    dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
+        (start_coord[1], start_coord[0]), bearing=bearing
+    )
+    return dest_coord[1], dest_coord[0]
+
+
+def coordinate_difference_in_metres_to_degrees(
+    start_coord: tuple[float, float], distance_in_metres: int, bearing: int = 90
+) -> tuple[float, float]:
+    """
+    Calculates the number of degrees away from a start point, given a certain bearing and a distance in metres.
+    ::start_coord: Must be in (lon, lat) form
+    ::param bearing:: in degrees, so 0 is North, 90 is East, 180 is South, 270 or -90 is West.
+    """
+    dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
+        (start_coord[1], start_coord[0]), bearing=bearing
+    )
+    return (dest_coord[1] - start_coord[0]), (dest_coord[0] - start_coord[1])
 
 
 def print_tif_metadata(*, tif_name: str) -> None:
@@ -111,7 +220,7 @@ def print_first_feature_of_shp(file):
 def plot_raster(
     *,
     tif_name: str,
-    fig_size: tuple[int, int] = None,
+    fig_size: tuple[int, int] = (9, 6),
 ) -> None:
     dataset = open_tif_with_gdal(file_name=tif_name)
     # Allocate our array using the first band's datatype
@@ -127,27 +236,13 @@ def plot_raster(
         band = dataset.GetRasterBand(b + 1)
         # Read in the band's data into the third dimension of our array
         image[:, :, b] = band.ReadAsArray()
-    if fig_size:
-        plt.figure(figsize=(fig_size, fig_size[0], fig_size[1]))
-    plt.imshow(image[:, :, 0], origin="lower")
+
+    plt.rcParams["figure.figsize"] = [fig_size[0], fig_size[1]]
+    plt.rcParams["figure.autolayout"] = True
+
+    plt.imshow(image[:, :, 0], origin="lower", extent=[-1, 1, -1, 1], aspect=1)
     plt.colorbar()
-
-
-def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
-    min_lon, min_lat, max_lon, max_lat = (
-        geo_df.total_bounds[0],
-        geo_df.total_bounds[1],
-        geo_df.total_bounds[2],
-        geo_df.total_bounds[3],
-    )
-    width = get_distance((min_lat, min_lon, min_lat, max_lon))
-    height = get_distance((min_lat, min_lon, max_lat, min_lon))
-    print(f"geo_df is {round(width)} m in width and {round(height)} m in height")
-    return width, height
-
-
-def rough_coord_diff_to_metres(coord_diff: float):
-    return coord_diff * 1000000
+    plt.show()
 
 
 ### Basic data processing
@@ -339,7 +434,7 @@ def make_kml_from_binned_multipolygon_dict(
     binned_multipolygon_dict: dict[str, sp.MultiPolygon],
     file_name: str,
     bins: tuple[Bin],
-    ignore_bin: int = None,
+    ignore_bin: list[int] = None,
     one_file_per_bin: bool = False,
 ) -> None:
     """
@@ -349,7 +444,7 @@ def make_kml_from_binned_multipolygon_dict(
     kml = simplekml.Kml()
     multipolodd = kml.newmultigeometry(name="MultiPoly")
     for bin in bins:
-        if bin.enum == ignore_bin:
+        if bin.enum in ignore_bin:
             continue
         for polygon in binned_multipolygon_dict[bin.enum].geoms:
             pol = multipolodd.newpolygon(
@@ -376,11 +471,13 @@ def run_interpolation(
     output_type="Byte",
     width: int = 0,
     height: int = 0,
-    output_res: list = None,
+    z_increase=0,
+    z_multiply=0,
     outputBounds: list = None,
     algorithm: str = "invdist",
-    power: int = 1,
+    power: int = None,
     smoothing: float = None,
+    radius: float = None,
     radius1: float = None,
     radius2: float = None,
     angle: int = None,
@@ -434,6 +531,7 @@ def run_interpolation(
         s = f"{algorithm}:"
         s += f"power={power}:" if power else ""
         s += f"smoothing={smoothing}:" if smoothing else ""
+        s += f"radius={radius}:" if radius else ""
         s += f"radius1={radius1}:" if radius1 else ""
         s += f"radius2={radius2}:" if radius2 else ""
         s += f"angle={angle}:" if angle else ""
@@ -469,16 +567,15 @@ def run_interpolation(
         new_options += ["-a", _get_algorithm_str()]
     if target_column is not None:
         new_options += ["-zfield", target_column]
-    # Maybe include spatFilter later?
-    # if spatFilter is not None:
-    #     new_options += ['-spat', str(spatFilter[0]), str(spatFilter[1]), str(spatFilter[2]), str(spatFilter[3])]
-    if output_res is not None:
-        new_options += ["-tr", str(output_res[0]), str(output_res[1])]
+    if z_increase is not None:
+        new_options += ["-z_increase", str(z_increase)]
+    if z_multiply is not None:
+        new_options += ["-z_increase", str(z_multiply)]
     print("Options: ", new_options)
 
     grid_options = gdal.GridOptions(options=new_options)
 
-    output_tif_name += f"-{algorithm}-{radius1}-{radius2}"
+    output_tif_name += f"-{algorithm}-{round(radius1*1000000,4)}"
     dest_name = TIF_PATH + output_tif_name + ".tif"
     src_ds = SHP_PATH + input_shp_name + ".shp.zip"
 
