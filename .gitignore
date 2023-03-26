@@ -174,3 +174,8 @@ dmypy.json
 
 # File-based project format
 *.iws
+
+# Output files
+shapefiles/
+tif_files/
+kml_files/

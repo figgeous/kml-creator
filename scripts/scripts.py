@@ -8,13 +8,12 @@ import numpy as np
 import pandas as pd
 import shapely as sp
 import simplekml
+from constants import *
 from geopy.point import Point as geopy_Point
 from osgeo import gdal
 from osgeo import gdal_array
 from osgeo import ogr
 from shapely.geometry import Point
-
-from constants import *
 
 
 @dataclass
@@ -24,7 +23,16 @@ class Bin:
     description: str
     lower_bound: int
     upper_bound: int
-    colour: str = None
+    colour: str
+    boundary_type: str = "[["
+    lower_bound_norm: float = None
+    upper_bound_norm: float = None
+
+    def set_normalisation(
+        self, max_bin_bound: int, normalize_to: int = 10
+    ) -> tuple[float, float]:
+        self.lower_bound_norm = self.lower_bound * normalize_to / max_bin_bound
+        self.upper_bound_norm = self.upper_bound * normalize_to / max_bin_bound
 
 
 ### For opening files
@@ -50,7 +58,10 @@ def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
 def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     assert ".shp" not in file_name
     file_path = SHP_PATH + file_name + ".shp.zip"
-    geo_df = gp.read_file(file_path)
+    try:
+        geo_df = gp.read_file(file_path)
+    except Exception:
+        print("Can't open shapefile.")
     print(f"Opened shapefile from {file_path}. Shape: {geo_df.shape}")
     return geo_df
 
