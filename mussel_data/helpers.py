@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,12 +39,15 @@ class Bin:
 
 ### For opening files
 def open_csv_as_dataframe(
-    *, file_name: str, sep: str = ",", index_col: Any = False
+    *, file_name: str, sep: str = ",", index_col: Any = 0
 ) -> pd.DataFrame:
     file_name = file_name + ".csv"
     file_path = CSV_PATH / file_name
-    df = pd.read_csv(file_path, sep=sep, index_col=index_col)
-    print(f"Opened csv from {file_path}. Shape: {df.shape}")
+    try:
+        df = pd.read_csv(file_path, sep=sep, index_col=index_col)
+        logging.info("Opened csv from %s. Shape: %s", file_path, df.shape)
+    except Exception as e:
+        logging.error("Can't open csv. %s", e)
     return df
 
 
@@ -57,13 +61,13 @@ def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
 
 
 def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
-    file_name = file_name + ".shp"
+    file_name = file_name + ".shp.zip"
     file_path = SHP_PATH / file_name
     try:
         geo_df = gp.read_file(file_path)
-    except Exception:
-        print("Can't open shapefile.")
-    print(f"Opened shapefile from {file_path}. Shape (rows, columns): {geo_df.shape}")
+        logging.info(f"Opened shapefile from {file_path}. Shape (rows, columns): {geo_df.shape}")
+    except Exception as e:
+        logging.error("Can't open shapefile. %s", e)
     return geo_df
 
 
@@ -136,7 +140,7 @@ def get_coordinate_a_distance_away(
 ### Display and measurement functions
 
 
-def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
+def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
     min_lon, min_lat, max_lon, max_lat = (
         geo_df.total_bounds[0],
         geo_df.total_bounds[1],
@@ -145,9 +149,7 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
     )
     width = get_distance((min_lon, min_lat, min_lon, max_lat))
     height = get_distance((min_lon, min_lat, max_lon, min_lat))
-    print(
-        f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height"
-    )
+    logging.info(f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height")
 
     coord_x_one_metre_away_at_bottom, _ = get_coordinate_a_distance_away(
         start_coord=(min_lon, min_lat),
@@ -165,16 +167,16 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[int, int]:
     distance_for_same_lat_at_right = get_distance(
         (max_lon, min_lat, max_lon, coord_y_one_metre_away_at_bottom)
     )
-    print(
-        "1.0 m metre of longitude at the bottom left is {} m at the top left.\n1.0 m metre of latitude at the bottom left is {} m at the bottom right.".format(
+    logging.info("1.0 m metre of longitude at the bottom left is {} m at the top left."
+                 "\n1.0 m metre of latitude at the bottom left is {} m at the bottom "
+                 "right.".format(
             round(distance_for_same_lon_at_top, 4),
-            round(distance_for_same_lat_at_right, 3),
-        )
+            round(distance_for_same_lat_at_right, 3),)
     )
     return width, height
 
 
-def get_distance(coords: tuple[int, int, int, int]) -> float:
+def get_distance(coords: tuple[float, float, float, float]) -> float:
     """
     Calculates the number of metres between coordinate points.
     Must be (lon_1, lat_1, lon_2, lat_2)
@@ -274,7 +276,7 @@ def grid_to_coordinate(*, grid_df: pd.DataFrame, target_column: str) -> pd.DataF
     return melt
 
 
-def dataframe_to_shp(*, input_df, output_file_path: str = None) -> gp.GeoDataFrame:
+def dataframe_to_shp(*, input_df, output_file_name: str) -> None:
     """
     Adds a column of shapely.geometry.point.Point objects corresponding to the lat and
     lon of each row. A geopandas.GeoDataFrame is a subclass of pandas.DataFrame.
@@ -286,12 +288,18 @@ def dataframe_to_shp(*, input_df, output_file_path: str = None) -> gp.GeoDataFra
     geo_df = gp.GeoDataFrame(input_df, geometry="geometry")
     geo_df = geo_df.reset_index()
     geo_df = geo_df.drop(columns=["index", "lat", "lon"])
-    if output_file_path:
-        assert ".shp.zip" not in output_file_path
+
+    output_file_name += ".shp.zip"
+    output_file_path = SHP_PATH / output_file_name
+    try:
         geo_df.to_file(
-            SHP_PATH + output_file_path + ".shp.zip", driver="ESRI Shapefile"
+            output_file_path , driver="ESRI Shapefile"
         )
-    return geo_df
+        logging.info("pandas.DataFrame converted to geopandas.GeoDataFrame and saved to"
+                     + str(output_file_path))
+    except Exception as e:
+        logging.error("Could not save geopandas.GeoDataFrame to " + str(output_file_path))
+        logging.error(e)
 
 
 def add_bin_enum_to_df(df: pd.DataFrame, bins: tuple[Bin], column: str) -> pd.DataFrame:
