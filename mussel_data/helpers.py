@@ -32,7 +32,6 @@ class Bin:
     kml_file_name: str = None
 
 
-
 ### For opening files
 def open_csv_as_dataframe(
     *, file_name: str, sep: str = ",", index_col: Any = 0
@@ -61,7 +60,9 @@ def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     file_path = SHP_PATH / file_name
     try:
         geo_df = gp.read_file(file_path)
-        logging.info(f"Opened shapefile from {file_path}. Shape (rows, columns): {geo_df.shape}")
+        logging.info(
+            f"Opened shapefile from {file_path}. Shape (rows, columns): {geo_df.shape}"
+        )
     except Exception as e:
         logging.error("Can't open shapefile. %s", e)
     return geo_df
@@ -143,7 +144,9 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
     )
     width = get_distance((min_lon, min_lat, min_lon, max_lat))
     height = get_distance((min_lon, min_lat, max_lon, min_lat))
-    logging.info(f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height")
+    logging.info(
+        f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height"
+    )
 
     coord_x_one_metre_away_at_bottom, _ = get_coordinate_a_distance_away(
         start_coord=(min_lon, min_lat),
@@ -161,11 +164,13 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
     distance_for_same_lat_at_right = get_distance(
         (max_lon, min_lat, max_lon, coord_y_one_metre_away_at_bottom)
     )
-    logging.info("1.0 m metre of longitude at the bottom left is {} m at the top left."
-                 "\n1.0 m metre of latitude at the bottom left is {} m at the bottom "
-                 "right.".format(
+    logging.info(
+        "1.0 m metre of longitude at the bottom left is {} m at the top left."
+        "\n1.0 m metre of latitude at the bottom left is {} m at the bottom "
+        "right.".format(
             round(distance_for_same_lon_at_top, 4),
-            round(distance_for_same_lat_at_right, 3),)
+            round(distance_for_same_lat_at_right, 3),
+        )
     )
     return width, height
 
@@ -205,17 +210,23 @@ def coordinate_difference_in_metres_to_degrees(
     )
     return (dest_coord[1] - start_coord[0]), (dest_coord[0] - start_coord[1])
 
-def coordinate_difference_in_metres_to_degrees_x_and_y(geo_df: gp.GeoDataFrame, lon_metres: int, lat_metres: int) -> tuple[float, float]:
+
+def coordinate_difference_in_metres_to_degrees_x_and_y(
+    geo_df: gp.GeoDataFrame, lon_metres: int, lat_metres: int
+) -> tuple[float, float]:
     """
     Calculates the number of degrees away from a start point, given a certain number of
     metres north (lat_metres) and the same the for a number of metres east (lon_metres).
     """
     start_coord = (geo_df.total_bounds[0], geo_df.total_bounds[1])
     metres_of_lon, _ = coordinate_difference_in_metres_to_degrees(
-        start_coord=start_coord, distance_in_metres=lon_metres)
+        start_coord=start_coord, distance_in_metres=lon_metres
+    )
     _, metres_of_lat = coordinate_difference_in_metres_to_degrees(
-        start_coord=start_coord, distance_in_metres=lat_metres, bearing=0)
+        start_coord=start_coord, distance_in_metres=lat_metres, bearing=0
+    )
     return metres_of_lon, metres_of_lat
+
 
 def print_tif_metadata(*, tif_name: str) -> None:
     metadata = os.popen("gdalinfo " / TIF_PATH / (tif_name + ".tif")).read()
@@ -298,12 +309,18 @@ def dataframe_to_shp(*, input_df, output_file_name: str) -> None:
     output_file_path = SHP_PATH / output_file_name
     try:
         geo_df.to_file(
-            output_file_path , driver="ESRI Shapefile", projection="EPSG:4326",
+            output_file_path,
+            driver="ESRI Shapefile",
+            projection="EPSG:4326",
         )
-        logging.info("pandas.DataFrame converted to geopandas.GeoDataFrame and saved to"
-                     + str(output_file_path))
+        logging.info(
+            "pandas.DataFrame converted to geopandas.GeoDataFrame and saved to"
+            + str(output_file_path)
+        )
     except Exception as e:
-        logging.error("Could not save geopandas.GeoDataFrame to " + str(output_file_path))
+        logging.error(
+            "Could not save geopandas.GeoDataFrame to " + str(output_file_path)
+        )
         logging.error(e)
 
 
@@ -384,6 +401,7 @@ def run_polygonize(
     )
     logging.info("Polygonized " + str(input_tif_path) + " to " + str(output_shp_path))
 
+
 ### KML creation
 
 
@@ -391,6 +409,7 @@ def _save_kml(kml: simplekml.Kml, file_name: str):
     file_path = str(KML_PATH / (file_name + ".kml"))
     kml.save(file_path)
     logging.info("Saved kml file to " + file_path)
+
 
 def make_kml_from_geo_df_single_bin(
     polygon_df: gp.GeoDataFrame,
@@ -454,6 +473,7 @@ def make_kml_from_one_multipolygon(
         pol.style.polystyle.outline = 0
     _save_kml(kml=kml, file_name=file_name)
 
+
 def make_kml_from_binned_multipolygon_dict(
     *,
     binned_multipolygon_dict: dict[str, sp.MultiPolygon],
@@ -495,8 +515,8 @@ def run_interpolation(
     output_type="Byte",
     width: int = 0,
     height: int = 0,
-    z_increase= None,
-    z_multiply= None,
+    z_increase=None,
+    z_multiply=None,
     outputBounds: list = None,
     algorithm: str = "invdist",
     power: int = None,
@@ -598,21 +618,25 @@ def run_interpolation(
     if z_multiply is not None:
         new_options += ["-z_increase", str(z_multiply)]
     if sql is not None:
-        new_options += ['-sql', str(sql)]
+        new_options += ["-sql", str(sql)]
     if where is not None:
-        new_options += ['-where', str(where)]
+        new_options += ["-where", str(where)]
 
     grid_options = gdal.GridOptions(options=new_options)
 
     dest_name = str(TIF_PATH / (output_tif_name + ".tif"))
     src_ds = str(SHP_PATH / (input_shp_name + ".shp.zip"))
 
-    logging.info("Running interpolation on: {} \nOptions: {} \nSaving to: {}"
-                 .format(str(src_ds), str(new_options), str(dest_name)))
+    logging.info(
+        "Running interpolation on: {} \nOptions: {} \nSaving to: {}".format(
+            str(src_ds), str(new_options), str(dest_name)
+        )
+    )
 
     idw = gdal.Grid(destName=dest_name, srcDS=src_ds, options=grid_options)
     idw = None
     return output_tif_name
+
 
 def run_interpolation_jupyter(
     *,
@@ -625,8 +649,8 @@ def run_interpolation_jupyter(
     output_type="Byte",
     width: int = 0,
     height: int = 0,
-    z_increase= None,
-    z_multiply= None,
+    z_increase=None,
+    z_multiply=None,
     outputBounds: list = None,
     algorithm: str = "invdist",
     power: int = None,
@@ -728,17 +752,20 @@ def run_interpolation_jupyter(
     if z_multiply is not None:
         new_options += ["-z_increase", str(z_multiply)]
     if sql is not None:
-        new_options += ['-sql', str(sql)]
+        new_options += ["-sql", str(sql)]
     if where is not None:
-        new_options += ['-where', str(where)]
+        new_options += ["-where", str(where)]
 
     grid_options = gdal.GridOptions(options=new_options)
 
     dest_name = str(TIF_PATH / (output_tif_name + ".tif"))
     src_ds = str(SHP_PATH / (input_shp_name + ".shp.zip"))
 
-    logging.info("Running interpolation on: {} \nOptions: {} \nSaving to: {}"
-                 .format(str(src_ds), str(new_options), str(dest_name)))
+    logging.info(
+        "Running interpolation on: {} \nOptions: {} \nSaving to: {}".format(
+            str(src_ds), str(new_options), str(dest_name)
+        )
+    )
 
     idw = gdal.Grid(destName=dest_name, srcDS=src_ds, options=grid_options)
     idw = None

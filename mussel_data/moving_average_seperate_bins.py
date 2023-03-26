@@ -18,33 +18,45 @@ width, height = get_geodf_dimensions(geo_df=geo_df)
 
 radius1_metres = 60
 radius2_metres = 10
-pixel_size = 10 #in metres
+pixel_size = 10  # in metres
 radius1_degrees, radies2_degrees = coordinate_difference_in_metres_to_degrees_x_and_y(
     geo_df=geo_df,
     lon_metres=radius1_metres,
-    lat_metres=radius2_metres,)
+    lat_metres=radius2_metres,
+)
 target_column = bm_dens_col_name
 #
 # Create a new shapefile for each bin
 for bin in bm_dens_bins:
     temp_df = None
     if bin.boundary_type == "[[":
-        temp_df = geo_df[(geo_df["bm_dens"] >= bin.lower) & (geo_df["bm_dens"] < bin.upper)]
+        temp_df = geo_df[
+            (geo_df["bm_dens"] >= bin.lower) & (geo_df["bm_dens"] < bin.upper)
+        ]
     elif bin.boundary_type == "[]":
-        temp_df = geo_df[(geo_df["bm_dens"] >= bin.lower) & (geo_df["bm_dens"] <= bin.upper)]
+        temp_df = geo_df[
+            (geo_df["bm_dens"] >= bin.lower) & (geo_df["bm_dens"] <= bin.upper)
+        ]
     else:
         raise NotImplementedError("Boundary type not implemented: " + bin.boundary_type)
-    bin_file_name ="{}-{}-bin_{}".format(main_name, bin.column, str(bin.enum))
+    bin_file_name = "{}-{}-bin_{}".format(main_name, bin.column, str(bin.enum))
     save_geodataframe_to_shp(geo_df=temp_df, file_name=bin_file_name)
     bin.bin_shp_file_name = bin_file_name
 
 # Run the interpolation for each bin
 for bin in bm_dens_bins:
     # main_name="only_bm_seg_bin_3"
-    output_tif_name = "Trial-bin_"+str(bin.enum)
+    output_tif_name = "Trial-bin_" + str(bin.enum)
     print(
-        [main_name, target_column, radius1_degrees, radies2_degrees, width / pixel_size,
-         height / pixel_size])
+        [
+            main_name,
+            target_column,
+            radius1_degrees,
+            radies2_degrees,
+            width / pixel_size,
+            height / pixel_size,
+        ]
+    )
     bin_name_full = run_interpolation(
         input_shp_name=bin.bin_shp_file_name,
         target_column=target_column,
@@ -52,8 +64,8 @@ for bin in bm_dens_bins:
         algorithm="average",
         radius1=radius1_degrees,
         radius2=radies2_degrees,
-        width=int(width/pixel_size),
-        height=int(height/pixel_size),
+        width=int(width / pixel_size),
+        height=int(height / pixel_size),
     )
     bin.tif_file_name = bin_name_full
 
@@ -66,7 +78,7 @@ for bin in bm_dens_bins:
         output_shp=output_shp_name,
         # mask='none',
         # options=["-mask", tif_name]
-        )
+    )
     bin.polygon_shp_file_name = output_shp_name
 
 # make kml files
@@ -74,9 +86,8 @@ for bin in bm_dens_bins:
     polygon_df = open_shp_with_geopandas(file_name=bin.polygon_shp_file_name)
     polygon_df = polygon_df[polygon_df["DN"] != 0]
     kml_file_name = make_kml_from_geo_df_single_bin(
-        polygon_df=polygon_df,
-        kml_file_name=bin.polygon_shp_file_name,
-        bin=bin)
+        polygon_df=polygon_df, kml_file_name=bin.polygon_shp_file_name, bin=bin
+    )
     bin.kml_file_name = kml_file_name
 
 # remove the temporary files

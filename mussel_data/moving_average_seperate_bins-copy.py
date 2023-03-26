@@ -18,22 +18,27 @@ width, height = get_geodf_dimensions(geo_df=geo_df)
 
 radius1_metres = 60
 radius2_metres = 10
-pixel_size = 10 #in metres
+pixel_size = 10  # in metres
 radius1_degrees, radies2_degrees = coordinate_difference_in_metres_to_degrees_x_and_y(
     geo_df=geo_df,
     lon_metres=radius1_metres,
-    lat_metres=radius1_metres,)
+    lat_metres=radius1_metres,
+)
 target_column = bm_dens_col_name
 
 # Run the interpolation for each bin
 for bin in bm_dens_bins:
     if bin.boundary_type == "[]":
-        where_string = f"{target_column} >= {bin.lower} and {target_column} <= {bin.upper}"
+        where_string = (
+            f"{target_column} >= {bin.lower} and {target_column} <= {bin.upper}"
+        )
     elif bin.boundary_type == "[[":
-        where_string = f"{target_column} >= {bin.lower} and {target_column} < {bin.upper}"
+        where_string = (
+            f"{target_column} >= {bin.lower} and {target_column} < {bin.upper}"
+        )
     else:
         raise NotImplementedError(f"Boundary type not implemented: {bin.boundary_type}")
-    output_tif_name = "Trial-bin_"+str(bin.enum)
+    output_tif_name = "Trial-bin_" + str(bin.enum)
     print(main_name, target_column, where_string)
     bin_name_full = run_interpolation(
         input_shp_name=main_name,
@@ -42,8 +47,8 @@ for bin in bm_dens_bins:
         algorithm="average",
         radius1=radius1_degrees,
         radius2=radies2_degrees,
-        width=int(width/pixel_size),
-        height=int(height/pixel_size),
+        width=int(width / pixel_size),
+        height=int(height / pixel_size),
         where=where_string,
     )
     bin.tif_file_name = bin_name_full
@@ -55,8 +60,9 @@ for bin in bm_dens_bins:
     run_polygonize(
         input_tif=tif_name,
         output_shp=output_shp_name,
-        mask='none',
-        options=["-mask", tif_name])
+        mask="none",
+        options=["-mask", tif_name],
+    )
     bin.polygon_shp_file_name = output_shp_name
 
 # make kml files
@@ -65,6 +71,5 @@ for bin in bm_dens_bins:
     polygon_df = polygon_df[polygon_df["DN"] != 0]
     print(polygon_df["DN"].value_counts())
     make_kml_from_geo_df_single_bin(
-        polygon_df=polygon_df,
-        kml_file_name=bin.polygon_shp_file_name,
-        bin=bin)
+        polygon_df=polygon_df, kml_file_name=bin.polygon_shp_file_name, bin=bin
+    )
