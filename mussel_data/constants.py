@@ -15,7 +15,3 @@ if DEBUG:
                         format='%(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO
                         )
-
-
-a = CSV_PATH / "test" / ".csv"
-print(a.absolute())
