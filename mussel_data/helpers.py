@@ -3,27 +3,22 @@ from typing import Any
 
 import geopandas as gp
 import geopy.distance
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import shapely as sp
 import simplekml
 from constants import *
-from geopy.point import Point as geopy_Point
 from osgeo import gdal
-from osgeo import gdal_array
-from osgeo import ogr
-from shapely.geometry import Point
 
 
 @dataclass
 class Bin:
-    column: str
     enum: int
+    column: str
     description: str
     lower: int
     upper: int
     colour: str
+    ignore: bool = False
     boundary_type: str = "[["
     bin_shp_file_name: str = None
     tif_file_name: str = None
@@ -45,8 +40,9 @@ def open_csv_as_dataframe(
     return df
 
 
-def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
-    assert ".shp" not in file_name
+def open_shp_with_gdal(*, file_name: str):
+    from osgeo import ogr
+
     file_path = SHP_PATH + file_name + ".shp.zip"
     ogr_datasource = ogr.Open(file_path)
     assert ogr_datasource
@@ -56,6 +52,7 @@ def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
 
 def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     file_path = str(SHP_PATH / (file_name + ".shp.zip"))
+    geo_df: gp.GeoDataFrame = None
     try:
         geo_df = gp.read_file(file_path)
         logging.info(
@@ -178,6 +175,8 @@ def get_distance(coords: tuple[float, float, float, float]) -> float:
     Calculates the number of metres between coordinate points.
     Must be (lon_1, lat_1, lon_2, lat_2)
     """
+    from geopy.point import Point as geopy_Point
+
     p1 = geopy_Point(longitude=coords[0], latitude=coords[1])
     p2 = geopy_Point(longitude=coords[2], latitude=coords[3])
     return geopy.distance.geodesic(p1, p2).m
@@ -250,6 +249,10 @@ def plot_raster(
     tif_name: str,
     fig_size: tuple[int, int] = (9, 6),
 ) -> None:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from osgeo import gdal_array
+
     dataset = open_tif_with_gdal(file_name=tif_name)
     # Allocate our array using the first band's datatype
     image_datatype = dataset.GetRasterBand(1).DataType
@@ -295,7 +298,8 @@ def dataframe_to_shp(*, input_df, output_file_name: str) -> None:
     Adds a column of shapely.geometry.point.Point objects corresponding to the lat and
     lon of each row. A geopandas.GeoDataFrame is a subclass of pandas.DataFrame.
     """
-    # combine lat and lon column to a shapely Point() object
+    from shapely.geometry import Point
+
     input_df["geometry"] = input_df.apply(
         lambda x: Point((float(x.lon), float(x.lat))), axis=1
     )
@@ -328,6 +332,8 @@ def add_bin_enum_to_df(df: pd.DataFrame, bins: tuple[Bin], column: str) -> pd.Da
     within bin.lower_bound and bin.upper_bound is given the value bin.enum. The new
     column is the original column +"_b"
     """
+    import numpy as np
+
     conditions, categories = [], []
     for bin in bins:
         conditions.append(
@@ -375,9 +381,6 @@ def run_polygonize(
     connectedness8: bool = False,
     options: list = None,
 ) -> None:
-    assert ".tif" not in input_tif
-    if output_shp:
-        assert ".shp" not in output_shp
     from osgeo_utils.gdal_polygonize import gdal_polygonize
 
     input_tif_path = TIF_PATH / (input_tif + ".tif")
@@ -396,6 +399,7 @@ def run_polygonize(
         mask=mask,
         connectedness8=connectedness8,
         options=options,
+        quiet=True,
     )
     logging.info("Polygonized " + str(input_tif_path) + " to " + str(output_shp_path))
 
@@ -456,20 +460,35 @@ def make_kml_from_geo_df_multi_bin(
     _save_kml(kml=kml, file_name=file_name)
 
 
-def make_kml_from_one_multipolygon(
-    file_name: str, multi_poly: sp.MultiPolygon, bin: Bin
-) -> None:
-    assert ".kml" not in file_name
+def make_kml_from_one_polygon_or_multipolygon(
+    file_name: str, polygon: sp.Polygon | sp.MultiPolygon, bin: Bin
+) -> str:
     kml = simplekml.Kml()
     multipolodd = kml.newmultigeometry(name="MultiPoly")
-    for polygon in multi_poly.geoms:
-        pol = multipolodd.newpolygon(
+
+    if isinstance(polygon, sp.Polygon):
+        polygon = multipolodd.newpolygon(
             name="polygon",
             outerboundaryis=list(polygon.exterior.coords),
         )
-        pol.style.polystyle.color = bin.colour
-        pol.style.polystyle.outline = 0
-    _save_kml(kml=kml, file_name=file_name)
+        polygon.style.polystyle.color = bin.colour
+        polygon.style.polystyle.outline = 0
+        file_path = str(KML_PATH / (file_name + ".kml"))
+    elif isinstance(polygon, sp.MultiPolygon):
+        for polygon in polygon.geoms:
+            pol = multipolodd.newpolygon(
+                name="polygon",
+                outerboundaryis=list(polygon.exterior.coords),
+            )
+            pol.style.polystyle.color = bin.colour
+            pol.style.polystyle.outline = 0
+            file_path = str(KML_PATH / (file_name + ".kml"))
+    else:
+        raise TypeError("Polygon must be a shapely Polygon or MultiPolygon")
+
+    kml.save(file_path)
+    logging.info("Saved kml file to " + file_path)
+    return file_name
 
 
 def make_kml_from_binned_multipolygon_dict(
@@ -503,140 +522,6 @@ def make_kml_from_binned_multipolygon_dict(
 
 ### Algorithm
 def run_interpolation(
-    *,
-    # For gdal_grid
-    input_shp_name: str,
-    target_column: str,
-    output_tif_name: str,
-    # Below are associated with GdalOptions
-    output_format: str = "Gtiff",
-    output_type="Byte",
-    width: int = 0,
-    height: int = 0,
-    z_increase=None,
-    z_multiply=None,
-    outputBounds: list = None,
-    algorithm: str = "invdist",
-    power: int = None,
-    smoothing: float = None,
-    radius: float = None,
-    radius1: float = None,
-    radius2: float = None,
-    angle: int = None,
-    max_points: int = None,
-    min_points: int = None,
-    max_points_per_quadrant: int = 0,
-    min_points_per_quadrant: int = 0,
-    nodata: float = None,
-    where: str = None,
-    sql: str = None,
-) -> str:
-    """
-    Keyword arguments are :
-        input_shp_name ---
-        target_column ---
-        output_tif_name ---
-        output_format --- output format ("GTiff", etc...)
-        output_type --- output type (gdalconst.GDT_Byte, etc...)
-        width --- width of the output raster in pixel
-        height --- height of the output raster in pixel
-        output_res --- resolution of output file
-        outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
-
-        #Related to algorithm
-        algorithm --- algorithm to use, e.g. "invdist", "nearest", "average", "linear"
-        power --- power used by algorithm
-        smoothing --- smoothing used by algorithm
-        radius1 ---
-        radius2 ---
-        angle ---
-        max_points ---
-        min_points ---
-        no_data ---
-
-        #Not implemented:
-        outputSRS --- assigned output SRS
-        layers --- list of layers to convert
-        spatFilter --- spatial filter as (minX, minY, maxX, maxY) bounding box
-    """
-    assert ".shp.zip" not in input_shp_name
-    assert ".tif" not in output_tif_name
-
-    def _get_output_bounds() -> list:
-        return [
-            "%.18g" % outputBounds[0],
-            "%.18g" % outputBounds[2],
-            "-tye",
-            "%.18g" % outputBounds[1],
-            "%.18g" % outputBounds[3],
-        ]
-
-    def _get_algorithm_str() -> str:
-        s = f"{algorithm}:"
-        s += f"power={power}:" if power else ""
-        s += f"smoothing={smoothing}:" if smoothing else ""
-        s += f"radius={radius}:" if radius else ""
-        s += f"radius1={radius1}:" if radius1 else ""
-        s += f"radius2={radius2}:" if radius2 else ""
-        s += f"angle={angle}:" if angle else ""
-        s += f"max_points={max_points}:" if max_points else ""
-        s += f"min_points={min_points}:" if min_points else ""
-        s += (
-            f"max_points_per_quadrant={max_points_per_quadrant}:"
-            if max_points_per_quadrant
-            else ""
-        )
-        s += (
-            f"min_points_per_quadrant={min_points_per_quadrant}:"
-            if min_points_per_quadrant
-            else ""
-        )
-        s += f"nodata={nodata}:" if nodata else ""
-        return s
-
-    # Not implemented settings include: creationOptions, layers
-    new_options = []
-    if output_format is not None:
-        new_options += ["-of", output_format]
-    if output_type is not None:
-        new_options += ["-ot", output_type]
-    if width != 0 or height != 0:
-        new_options += ["-outsize", str(width), str(height)]
-    if outputBounds is not None:
-        new_options += ["-txe"] + _get_output_bounds()
-    # Maybe include outputSRS later?
-    # if outputSRS is not None:
-    #     new_options += ['-a_srs', str(outputSRS)]
-    if algorithm is not None:
-        new_options += ["-a", _get_algorithm_str()]
-    if target_column is not None:
-        new_options += ["-zfield", target_column]
-    if z_increase is not None:
-        new_options += ["-z_increase", str(z_increase)]
-    if z_multiply is not None:
-        new_options += ["-z_increase", str(z_multiply)]
-    if sql is not None:
-        new_options += ["-sql", str(sql)]
-    if where is not None:
-        new_options += ["-where", str(where)]
-
-    grid_options = gdal.GridOptions(options=new_options)
-
-    dest_name = str(TIF_PATH / (output_tif_name + ".tif"))
-    src_ds = str(SHP_PATH / (input_shp_name + ".shp.zip"))
-
-    logging.info(
-        "Running interpolation on: {} \nOptions: {} \nSaving to: {}".format(
-            str(src_ds), str(new_options), str(dest_name)
-        )
-    )
-
-    idw = gdal.Grid(destName=dest_name, srcDS=src_ds, options=grid_options)
-    idw = None
-    return output_tif_name
-
-
-def run_interpolation_jupyter(
     *,
     # For gdal_grid
     input_shp_name: str,
