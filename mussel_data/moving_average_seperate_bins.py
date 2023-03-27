@@ -1,7 +1,7 @@
 from mussel_data.helpers import *
 
 create_new_shp = False
-main_name = "only_bm_seg"
+main_name = "only_bm"
 bm_dens_col_name = "bm_dens"
 bm_dens_bins = (
     Bin(bm_dens_col_name, 1, "First bin", 0, 20, simplekml.Color.yellow),
