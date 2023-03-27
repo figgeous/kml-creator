@@ -2,10 +2,11 @@ import logging
 import os
 from pathlib import Path
 
-CSV_PATH = Path("./csv_files")
-SHP_PATH = Path("./shapefiles")
-TIF_PATH = Path("./tif_files")
-KML_PATH = Path("./kml_files")
+mussel_data_path = Path("mussel_data")
+CSV_PATH = mussel_data_path / "csv_files"
+SHP_PATH = mussel_data_path / "shp_files"
+TIF_PATH = mussel_data_path / "tif_files"
+KML_PATH = mussel_data_path / "kml_files"
 
 DEBUG = True
 

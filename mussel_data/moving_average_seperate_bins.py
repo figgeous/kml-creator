@@ -1,12 +1,12 @@
-from mussel_data.helpers import *
+from helpers import *
 
 create_new_shp = False
 main_name = "only_bm"
 bm_dens_col_name = "bm_dens"
 bm_dens_bins = (
     Bin(bm_dens_col_name, 1, "First bin", 0, 20, simplekml.Color.yellow),
-    Bin(bm_dens_col_name, 2, "Second bin", 20, 40, simplekml.Color.orange),
-    Bin(bm_dens_col_name, 3, "Third bin", 40, 60, simplekml.Color.red, "[]"),
+    Bin(bm_dens_col_name, 2, "Second bin", 20, 40, simplekml.Color.hex("5CFF21")),
+    Bin(bm_dens_col_name, 3, "Third bin", 40, 60, simplekml.Color.hex("3B9C17"), "[]"),
 )
 
 if create_new_shp:
@@ -15,19 +15,11 @@ if create_new_shp:
 
 geo_df = open_shp_with_geopandas(file_name=main_name)
 width, height = get_geodf_dimensions(geo_df=geo_df)
-
-radius1_metres = 60
-radius2_metres = 10
-pixel_size = 10  # in metres
-radius1_degrees, radies2_degrees = coordinate_difference_in_metres_to_degrees_x_and_y(
-    geo_df=geo_df,
-    lon_metres=radius1_metres,
-    lat_metres=radius2_metres,
-)
 target_column = bm_dens_col_name
 #
 # Create a new shapefile for each bin
 for bin in bm_dens_bins:
+    print("Creating shapefile for bin: " + str(bin.enum))
     temp_df = None
     if bin.boundary_type == "[[":
         temp_df = geo_df[
@@ -44,19 +36,19 @@ for bin in bm_dens_bins:
     bin.bin_shp_file_name = bin_file_name
 
 # Run the interpolation for each bin
+print("Running interpolation for each bin")
+radius1_metres = 60
+radius2_metres = 10
+pixel_size = 10  # in metres
+radius1_degrees, radies2_degrees = coordinate_difference_in_metres_to_degrees_x_and_y(
+    geo_df=geo_df,
+    lon_metres=radius1_metres,
+    lat_metres=radius2_metres,
+)
 for bin in bm_dens_bins:
+    print("Running interpolation for bin: " + str(bin.enum))
     # main_name="only_bm_seg_bin_3"
     output_tif_name = "Trial-bin_" + str(bin.enum)
-    print(
-        [
-            main_name,
-            target_column,
-            radius1_degrees,
-            radies2_degrees,
-            width / pixel_size,
-            height / pixel_size,
-        ]
-    )
     bin_name_full = run_interpolation(
         input_shp_name=bin.bin_shp_file_name,
         target_column=target_column,
@@ -71,6 +63,7 @@ for bin in bm_dens_bins:
 
 # Run polygonize for each bin
 for bin in bm_dens_bins:
+    print("Running polygonize for bin: " + str(bin.enum))
     tif_name = bin.tif_file_name
     output_shp_name = bin.tif_file_name + "_polygons"
     run_polygonize(
@@ -83,6 +76,7 @@ for bin in bm_dens_bins:
 
 # make kml files
 for bin in bm_dens_bins:
+    print("Making kml for bin: " + str(bin.enum))
     polygon_df = open_shp_with_geopandas(file_name=bin.polygon_shp_file_name)
     polygon_df = polygon_df[polygon_df["DN"] != 0]
     kml_file_name = make_kml_from_geo_df_single_bin(
@@ -92,6 +86,7 @@ for bin in bm_dens_bins:
 
 # remove the temporary files
 for bin in bm_dens_bins:
+    print("Removing temporary files for bin: " + str(bin.enum))
     shp_file_path = str(SHP_PATH / bin.bin_shp_file_name) + ".shp.zip"
     tif_file_path = str(TIF_PATH / bin.tif_file_name) + ".tif"
     polygon_shp_file_path = str(SHP_PATH / bin.polygon_shp_file_name) + ".shp.zip"

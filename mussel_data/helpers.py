@@ -8,13 +8,12 @@ import numpy as np
 import pandas as pd
 import shapely as sp
 import simplekml
+from constants import *
 from geopy.point import Point as geopy_Point
 from osgeo import gdal
 from osgeo import gdal_array
 from osgeo import ogr
 from shapely.geometry import Point
-
-from .constants import *
 
 
 @dataclass
@@ -56,8 +55,7 @@ def open_shp_with_gdal(*, file_name: str) -> ogr.DataSource:
 
 
 def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
-    file_name = file_name + ".shp.zip"
-    file_path = SHP_PATH / file_name
+    file_path = str(SHP_PATH / (file_name + ".shp.zip"))
     try:
         geo_df = gp.read_file(file_path)
         logging.info(
