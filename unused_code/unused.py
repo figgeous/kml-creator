@@ -115,3 +115,137 @@ def unite_polygons_to_binned_multipolygon_dict(
         #     )
         # )
     return multipolygon_dict
+
+
+def open_shp_with_gdal(*, file_name: str):
+    from osgeo import ogr
+
+    file_path = SHP_PATH + file_name + ".shp.zip"
+    ogr_datasource = ogr.Open(file_path)
+    assert ogr_datasource
+    logging.info(f"Opened shapefile from {file_path}")
+    return ogr_datasource
+
+
+def open_or_create_and_open_shp_with_geopandas(
+    file_name: str,
+    bins: tuple[Bin],
+    target_col_for_enum: str,
+    make_new_geo_df: bool = False,
+    sep: str = ",",
+) -> tuple[gp.GeoDataFrame, int, int]:
+    make_new_geo_df = False
+    geo_df = None
+    try:
+        geo_df = open_shp_with_geopandas(file_name=file_name)
+    except Exception:
+        logging.exception("Count not load shapefile.")
+
+    if make_new_geo_df or geo_df.empty:
+        df = open_csv_as_dataframe(file_name=file_name, sep=sep, index_col=0)
+        df = add_bin_enum_to_df(df=df, bins=bins, column=target_col_for_enum)
+        geo_df = dataframe_to_shp(input_df=df)
+        save_geodataframe_to_shp(
+            geo_df=geo_df,
+            file_name=file_name,
+        )
+    dataset_width, dataset_height = get_geodf_dimensions(geo_df=geo_df)
+    return geo_df, dataset_width, dataset_height
+
+
+def save_dataframe_to_csv(
+    *, df: pd.DataFrame, file_name: str, sep: str = ",", index_col: str = None
+) -> pd.DataFrame:
+    file_path = CSV_PATH + file_name + ".csv"
+    return df.to_csv(path_or_buf=file_path, sep=sep)
+
+
+def grid_to_coordinate(*, grid_df: pd.DataFrame, target_column: str) -> pd.DataFrame:
+    """
+    Converts a grid format to a list of values and their coordinates. The grid is
+    2 dimensional with latitude on rows and longitude on columns. Lists of items and
+    their coordinates are easier to process. Target column is the resulting column
+    name.
+    """
+    grid_df = grid_df.reset_index()
+    melt = grid_df.melt(
+        id_vars=["index"], var_name=grid_df.columns[1], value_name=target_column
+    )
+    melt.columns = ["lat", "lon", target_column]
+    melt = melt.apply(pd.to_numeric)
+    return melt
+
+
+def add_bin_enum_to_df(df: pd.DataFrame, bins: tuple[Bin], column: str) -> pd.DataFrame:
+    """
+    Adds a column to df with a binned version of column. Each row in df that falls
+    within bin.lower_bound and bin.upper_bound is given the value bin.enum. The new
+    column is the original column +"_b"
+    """
+    import numpy as np
+
+    conditions, categories = [], []
+    for bin in bins:
+        conditions.append(
+            (df[column] >= bin.lower_bound) & (df[column] < bin.upper_bound)
+        )
+        categories.append(bin.enum)
+    df[column + "_s"] = np.select(conditions, categories)
+    return df
+
+
+def make_kml_from_binned_multipolygon_dict(
+    *,
+    binned_multipolygon_dict: dict[str, sp.MultiPolygon],
+    file_name: str,
+    bins: tuple[Bin],
+    ignore_bin: list[int] = None,
+    one_file_per_bin: bool = False,
+) -> None:
+    """
+    Use in conjunction with unite_polygons_to_binned_multipolygon_dict()
+    """
+    kml = simplekml.Kml()
+    multipolodd = kml.newmultigeometry(name="MultiPoly")
+    for bin in bins:
+        if bin.enum in ignore_bin:
+            continue
+        for polygon in binned_multipolygon_dict[bin.enum].geoms:
+            pol = multipolodd.newpolygon(
+                name="polygon",
+                outerboundaryis=list(polygon.exterior.coords),
+            )
+            pol.style.polystyle.color = bin.colour
+            pol.style.polystyle.outline = 0
+        if one_file_per_bin:
+            file_path = str(KML_PATH / (file_name + ".kml"))
+            kml.save(file_path)
+            logging.info("Saved kml file to " + file_path)
+    if not one_file_per_bin:
+        file_path = str(KML_PATH / (file_name + ".kml"))
+        kml.save(file_path)
+        logging.info("Saved kml file to " + file_path)
+
+
+def make_kml_from_geo_df_multi_bin(
+    file_name: str,
+    bins: tuple[Bin],
+    geo_df: gp.GeoDataFrame = None,
+    grouping_col: str = None,
+) -> None:
+    """
+    Takes all polygons in a geo_df and writes them into a kml file
+    """
+    kml = simplekml.Kml()
+    for bin in bins:
+        multipolodd = kml.newmultigeometry(name=bin.description)
+        for polygon in geo_df[geo_df[grouping_col] == bin.enum]["buffer"]:
+            pol = multipolodd.newpolygon(
+                name="polygon",
+                outerboundaryis=list(polygon.exterior.coords),
+            )
+            pol.style.polystyle.color = bin.colour
+            pol.style.polystyle.outline = 0
+    file_path = str(KML_PATH / (file_name + ".kml"))
+    kml.save(file_path)
+    logging.info("Saved kml file to " + file_path)

@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 
 mussel_data_path = Path("mussel_data")

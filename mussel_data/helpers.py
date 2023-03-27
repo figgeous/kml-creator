@@ -1,8 +1,8 @@
+import os
 from dataclasses import dataclass
 from typing import Any
 
 import geopandas as gp
-import geopy.distance
 import pandas as pd
 import shapely as sp
 import simplekml
@@ -26,6 +26,160 @@ class Bin:
     kml_file_name: str = None
 
 
+class Runner:
+    bins: list[Bin]
+    geo_df: gp.GeoDataFrame
+    dataset_name: str
+
+    def __init__(self, bins, geo_df, dataset_name):
+        self.bins = bins
+        self.geo_df = geo_df
+        self.dataset_name = dataset_name
+
+    def run_all(self, delete_files_when_done=True):
+        self.create_shp_for_each_bin()
+        self.run_interpolation_for_each_bin()
+        self.run_polygonize_for_each_bin()
+        self.create_kml_for_each_bin()
+        if delete_files_when_done:
+            self.delete_files()
+
+    def create_shp_for_each_bin(self) -> None:
+        ## Create a new shapefile for each bin
+        for bin in self.bins:
+            if bin.ignore:
+                continue
+            print("Creating shapefile for bin: " + str(bin.enum))
+            temp_df = None
+            if bin.boundary_type == "[[":
+                temp_df = self.geo_df[
+                    (self.geo_df[bin.column] >= bin.lower)
+                    & (self.geo_df[bin.column] < bin.upper)
+                ]
+            elif bin.boundary_type == "[]":
+                temp_df = self.geo_df[
+                    (self.geo_df[bin.column] >= bin.lower)
+                    & (self.geo_df[bin.column] <= bin.upper)
+                ]
+            else:
+                raise NotImplementedError(
+                    "Boundary type not implemented: " + bin.boundary_type
+                )
+
+            if temp_df.empty:
+                logging.info("Bin {} is empty. Ignoring.".format(bin.enum))
+                bin.ignore = True
+                continue
+            bin_file_name = "{}-{}-bin_{}".format(
+                self.dataset_name, bin.column, str(bin.enum)
+            )
+            if os.path.exists(str(SHP_PATH / (bin_file_name + ".shp"))):
+                os.remove(str(SHP_PATH / (bin_file_name + ".shp")))
+            save_geodataframe_to_shp(geo_df=temp_df, file_name=bin_file_name)
+            bin.bin_shp_file_name = bin_file_name
+
+    def run_interpolation_for_each_bin(self):
+        print("Running interpolation for each bin")
+        ## Run the interpolation for each bin
+        dataset_width, dataset_height = get_geodf_dimensions(geo_df=self.geo_df)
+        radius1_metres = 60
+        radius2_metres = 10
+        pixel_size = 10  # in metres
+        (
+            radius1_degrees,
+            radies2_degrees,
+        ) = coordinate_difference_in_metres_to_degrees_x_and_y(
+            geo_df=self.geo_df,
+            lon_metres=radius1_metres,
+            lat_metres=radius2_metres,
+        )
+        for bin in self.bins:
+            if bin.ignore:
+                continue
+            print("Running interpolation for bin: " + str(bin.enum))
+            tif_file_name = run_interpolation(
+                input_shp_name=bin.bin_shp_file_name,
+                target_column=bin.column,
+                output_tif_name=bin.bin_shp_file_name,
+                algorithm="average",
+                radius1=radius1_degrees,
+                radius2=radies2_degrees,
+                dataset_width=int(dataset_width / pixel_size),
+                dataset_height=int(dataset_height / pixel_size),
+            )
+            bin.tif_file_name = tif_file_name
+
+    def run_polygonize_for_each_bin(self):
+        ## Run polygonize for each bin
+        for bin in self.bins:
+            if bin.ignore:
+                continue
+            print("Running polygonize for bin: " + str(bin.enum))
+            output_shp_name = bin.tif_file_name + "_polygons"
+            run_polygonize(
+                input_tif=bin.tif_file_name,
+                output_shp=output_shp_name,
+                # mask='none',
+                # options=["-mask", tif_name]
+            )
+            bin.polygon_shp_file_name = output_shp_name
+
+    def create_kml_for_each_bin(self):
+        ## Unify and simplify polygons for each bin and make kml
+        for bin in self.bins:
+            if bin.ignore:
+                continue
+            print("Making kml for bin: " + str(bin.enum))
+            polygon_df = open_shp_with_geopandas(file_name=bin.polygon_shp_file_name)
+            polygon_df = polygon_df[polygon_df["DN"] != 0]
+            # Unify the polygons
+            united = sp.unary_union(polygon_df["geometry"])
+            # Simplify the polygon to reduce the number of points
+            simplification_tolerance_metres = 10
+            x1, y1 = united.bounds[0], united.bounds[1]
+            x2, _ = get_coordinate_a_distance_away(
+                start_coord=(x1, y1), distance_in_metres=simplification_tolerance_metres
+            )
+            simplification_tolerance_degrees = x2 - x1
+            united = united.simplify(tolerance=simplification_tolerance_degrees)
+            kml_file_name = make_kml_from_one_polygon_or_multipolygon(
+                file_name=bin.polygon_shp_file_name,
+                polygon=united,
+                bin=bin,
+            )
+            bin.kml_file_name = kml_file_name
+
+    def delete_files(self):
+        # remove the temporary files
+        for bin in self.bins:
+            if bin.ignore:
+                continue
+            print("Removing temporary files for bin: " + str(bin.enum))
+            shp_file_path = str(SHP_PATH / bin.bin_shp_file_name) + ".shp.zip"
+            tif_file_path = str(TIF_PATH / bin.tif_file_name) + ".tif"
+            polygon_shp_file_path = (
+                str(SHP_PATH / bin.polygon_shp_file_name) + ".shp.zip"
+            )
+
+            if os.path.exists(shp_file_path):
+                os.remove(shp_file_path)
+                logging.info("Removed file: " + shp_file_path)
+            else:
+                logging.info("File not found: " + shp_file_path)
+
+            if os.path.exists(tif_file_path):
+                os.remove(tif_file_path)
+                logging.info("Removed file: " + tif_file_path)
+            else:
+                logging.info("File not found: " + tif_file_path)
+
+            if os.path.exists(polygon_shp_file_path):
+                os.remove(polygon_shp_file_path)
+                logging.info("Removed file: " + polygon_shp_file_path)
+            else:
+                logging.info("File not found: " + polygon_shp_file_path)
+
+
 ### For opening files
 def open_csv_as_dataframe(
     *, file_name: str, sep: str = ",", index_col: Any = 0
@@ -38,16 +192,6 @@ def open_csv_as_dataframe(
     except Exception as e:
         logging.error("Can't open csv. %s", e)
     return df
-
-
-def open_shp_with_gdal(*, file_name: str):
-    from osgeo import ogr
-
-    file_path = SHP_PATH + file_name + ".shp.zip"
-    ogr_datasource = ogr.Open(file_path)
-    assert ogr_datasource
-    logging.info(f"Opened shapefile from {file_path}")
-    return ogr_datasource
 
 
 def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
@@ -63,32 +207,6 @@ def open_shp_with_geopandas(*, file_name: str) -> gp.GeoDataFrame:
     return geo_df
 
 
-def open_or_create_and_open_shp_with_geopandas(
-    file_name: str,
-    bins: tuple[Bin],
-    target_col_for_enum: str,
-    make_new_geo_df: bool = False,
-    sep: str = ",",
-) -> tuple[gp.GeoDataFrame, int, int]:
-    make_new_geo_df = False
-    geo_df = None
-    try:
-        geo_df = open_shp_with_geopandas(file_name=file_name)
-    except Exception:
-        logging.exception("Count not load shapefile.")
-
-    if make_new_geo_df or geo_df.empty:
-        df = open_csv_as_dataframe(file_name=file_name, sep=sep, index_col=0)
-        df = add_bin_enum_to_df(df=df, bins=bins, column=target_col_for_enum)
-        geo_df = dataframe_to_shp(input_df=df)
-        save_geodataframe_to_shp(
-            geo_df=geo_df,
-            file_name=file_name,
-        )
-    width, height = get_geodf_dimensions(geo_df=geo_df)
-    return geo_df, width, height
-
-
 def open_tif_with_gdal(*, file_name: str) -> gdal.Dataset:
     assert ".tif" not in file_name
     file_path = TIF_PATH / (file_name + ".tif")
@@ -99,11 +217,6 @@ def open_tif_with_gdal(*, file_name: str) -> gdal.Dataset:
 
 
 ### For saving
-def save_dataframe_to_csv(
-    *, df: pd.DataFrame, file_name: str, sep: str = ",", index_col: str = None
-) -> pd.DataFrame:
-    file_path = CSV_PATH + file_name + ".csv"
-    return df.to_csv(path_or_buf=file_path, sep=sep)
 
 
 def save_geodataframe_to_shp(geo_df: gp.GeoDataFrame, file_name: str) -> None:
@@ -113,6 +226,19 @@ def save_geodataframe_to_shp(geo_df: gp.GeoDataFrame, file_name: str) -> None:
 
 
 ### Display and measurement functions
+def get_distance(coords: tuple[float, float, float, float]) -> float:
+    """
+    Calculates the number of metres between coordinate points.
+    Must be (lon_1, lat_1, lon_2, lat_2)
+    """
+    from geopy.point import Point as geopy_Point
+    import geopy.distance
+
+    p1 = geopy_Point(longitude=coords[0], latitude=coords[1])
+    p2 = geopy_Point(longitude=coords[2], latitude=coords[3])
+    return geopy.distance.geodesic(p1, p2).m
+
+
 def get_coordinate_a_distance_away(
     start_coord: tuple[float, float], distance_in_metres: int, bearing: int = 90
 ) -> tuple[float, float]:
@@ -120,14 +246,13 @@ def get_coordinate_a_distance_away(
     ::params:: start_coord: Must be (lon, lat)
     return in (lon, lat) form
     """
+    import geopy.distance
+
     # p1 = geopy_Point(longitude=start_coord[0], latitude=start_coord[1])
     dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
         (start_coord[1], start_coord[0]), bearing=bearing
     )
     return dest_coord[1], dest_coord[0]
-
-
-### Display and measurement functions
 
 
 def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
@@ -137,10 +262,10 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
         geo_df.total_bounds[2],
         geo_df.total_bounds[3],
     )
-    width = get_distance((min_lon, min_lat, min_lon, max_lat))
-    height = get_distance((min_lon, min_lat, max_lon, min_lat))
+    dataset_width = get_distance((min_lon, min_lat, min_lon, max_lat))
+    dataset_height = get_distance((min_lon, min_lat, max_lon, min_lat))
     logging.info(
-        f"The dataset covers an area of {round(width)} m in width and {round(height)} m in height"
+        f"The dataset covers an area of {round(dataset_width)} m in dataset_width and {round(dataset_height)} m in dataset_height"
     )
 
     coord_x_one_metre_away_at_bottom, _ = get_coordinate_a_distance_away(
@@ -167,31 +292,7 @@ def get_geodf_dimensions(geo_df: gp.GeoDataFrame) -> tuple[float, float]:
             round(distance_for_same_lat_at_right, 3),
         )
     )
-    return width, height
-
-
-def get_distance(coords: tuple[float, float, float, float]) -> float:
-    """
-    Calculates the number of metres between coordinate points.
-    Must be (lon_1, lat_1, lon_2, lat_2)
-    """
-    from geopy.point import Point as geopy_Point
-
-    p1 = geopy_Point(longitude=coords[0], latitude=coords[1])
-    p2 = geopy_Point(longitude=coords[2], latitude=coords[3])
-    return geopy.distance.geodesic(p1, p2).m
-
-
-def get_coordinate_a_distance_away(
-    start_coord: tuple[float, float], distance_in_metres: int, bearing: int = 90
-) -> tuple[float, float]:
-    """
-    Must be (lon, lat)
-    """
-    dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
-        (start_coord[1], start_coord[0]), bearing=bearing
-    )
-    return dest_coord[1], dest_coord[0]
+    return dataset_width, dataset_height
 
 
 def coordinate_difference_in_metres_to_degrees(
@@ -202,6 +303,8 @@ def coordinate_difference_in_metres_to_degrees(
     ::start_coord: Must be in (lon, lat) form
     ::param bearing:: in degrees, so 0 is North, 90 is East, 180 is South, 270 or -90 is West.
     """
+    import geopy.distance
+
     dest_coord = geopy.distance.distance(meters=distance_in_metres).destination(
         (start_coord[1], start_coord[0]), bearing=bearing
     )
@@ -213,7 +316,7 @@ def coordinate_difference_in_metres_to_degrees_x_and_y(
 ) -> tuple[float, float]:
     """
     Calculates the number of degrees away from a start point, given a certain number of
-    metres north (lat_metres) and the same the for a number of metres east (lon_metres).
+    metres north (lat_metres) and the same for a number of metres east (lon_metres).
     """
     start_coord = (geo_df.total_bounds[0], geo_df.total_bounds[1])
     metres_of_lon, _ = coordinate_difference_in_metres_to_degrees(
@@ -230,25 +333,14 @@ def print_tif_metadata(*, tif_name: str) -> None:
     print(metadata)
 
 
-def print_first_feature_of_shp(file):
-    """
-    Should print out something like:
-    {"type": "Feature", "geometry": {"type": "Point",
-    "coordinates": [8.943549, 56.996942]}, "properties":
-    {"bm_dens": 10, "bm_size": 58}, "id": 0}
-    """
-    shape = file.GetLayer(0)
-    # first feature of the shapefile
-    feature = shape.GetFeature(1)
-    first = feature.ExportToJson()
-    print(first)  # (GeoJSON format)
-
-
 def plot_raster(
     *,
     tif_name: str,
     fig_size: tuple[int, int] = (9, 6),
 ) -> None:
+    """
+    Plots a raster image of a tif file using matplotlib.
+    """
     import numpy as np
     import matplotlib.pyplot as plt
     from osgeo import gdal_array
@@ -277,22 +369,6 @@ def plot_raster(
 
 
 ### Basic data processing
-def grid_to_coordinate(*, grid_df: pd.DataFrame, target_column: str) -> pd.DataFrame:
-    """
-    Converts a grid format to a list of values and their coordinates. The grid is
-    2 dimensional with latitude on rows and longitude on columns. Lists of items and
-    their coordinates are easier to process. Target column is the resulting column
-    name.
-    """
-    grid_df = grid_df.reset_index()
-    melt = grid_df.melt(
-        id_vars=["index"], var_name=grid_df.columns[1], value_name=target_column
-    )
-    melt.columns = ["lat", "lon", target_column]
-    melt = melt.apply(pd.to_numeric)
-    return melt
-
-
 def dataframe_to_shp(*, input_df, output_file_name: str) -> None:
     """
     Adds a column of shapely.geometry.point.Point objects corresponding to the lat and
@@ -326,24 +402,6 @@ def dataframe_to_shp(*, input_df, output_file_name: str) -> None:
         logging.error(e)
 
 
-def add_bin_enum_to_df(df: pd.DataFrame, bins: tuple[Bin], column: str) -> pd.DataFrame:
-    """
-    Adds a column to df with a binned version of column. Each row in df that falls
-    within bin.lower_bound and bin.upper_bound is given the value bin.enum. The new
-    column is the original column +"_b"
-    """
-    import numpy as np
-
-    conditions, categories = [], []
-    for bin in bins:
-        conditions.append(
-            (df[column] >= bin.lower_bound) & (df[column] < bin.upper_bound)
-        )
-        categories.append(bin.enum)
-    df[column + "_s"] = np.select(conditions, categories)
-    return df
-
-
 def add_square_buffer_to_geo_df(geo_df: gp.GeoDataFrame, size: float = 0.00005):
     """
     Adds a column of square polygons with centre at Point. Size in degrees
@@ -352,22 +410,6 @@ def add_square_buffer_to_geo_df(geo_df: gp.GeoDataFrame, size: float = 0.00005):
     # https://gis.stackexchange.com/questions/314949/creating-square-buffers-around-points-using-shapely
     geo_df["buffer"] = geo_df["geometry"].buffer(size, cap_style=3)
     return geo_df
-
-
-def shp_of_polygons_to_binned_dict(
-    *, bins: tuple[Bin], shp: object = None, shp_file_name: str = None
-) -> dict[int, dict[sp.Polygon]]:
-    """
-    Use either shp instance or shp_file_name. Creates a dictionary of keys related to
-    bin.enum and nested dictionary values containing polygons that fall within each bin.
-    """
-    if shp_file_name:
-        shp = open_shp_with_geopandas(file_name=shp_file_name)
-    polygon_dict = {}
-    for bin in bins:
-        polygon_dict[bin.enum] = shp[shp["DN"] == bin.enum]["geometry"].to_dict()
-    logging.info("Converted shapefile to binned polygon dictionary")
-    return polygon_dict
 
 
 ### Processing tif files
@@ -405,14 +447,6 @@ def run_polygonize(
 
 
 ### KML creation
-
-
-def _save_kml(kml: simplekml.Kml, file_name: str):
-    file_path = str(KML_PATH / (file_name + ".kml"))
-    kml.save(file_path)
-    logging.info("Saved kml file to " + file_path)
-
-
 def make_kml_from_geo_df_single_bin(
     polygon_df: gp.GeoDataFrame,
     kml_file_name: str,
@@ -436,28 +470,6 @@ def make_kml_from_geo_df_single_bin(
     kml.save(file_path)
     logging.info("Saved kml file to " + file_path)
     return file_path
-
-
-def make_kml_from_geo_df_multi_bin(
-    file_name: str,
-    bins: tuple[Bin],
-    geo_df: gp.GeoDataFrame = None,
-    grouping_col: str = None,
-) -> None:
-    """
-    Takes all polygons in a geo_df and writes them into a kml file
-    """
-    kml = simplekml.Kml()
-    for bin in bins:
-        multipolodd = kml.newmultigeometry(name=bin.description)
-        for polygon in geo_df[geo_df[grouping_col] == bin.enum]["buffer"]:
-            pol = multipolodd.newpolygon(
-                name="polygon",
-                outerboundaryis=list(polygon.exterior.coords),
-            )
-            pol.style.polystyle.color = bin.colour
-            pol.style.polystyle.outline = 0
-    _save_kml(kml=kml, file_name=file_name)
 
 
 def make_kml_from_one_polygon_or_multipolygon(
@@ -491,35 +503,6 @@ def make_kml_from_one_polygon_or_multipolygon(
     return file_name
 
 
-def make_kml_from_binned_multipolygon_dict(
-    *,
-    binned_multipolygon_dict: dict[str, sp.MultiPolygon],
-    file_name: str,
-    bins: tuple[Bin],
-    ignore_bin: list[int] = None,
-    one_file_per_bin: bool = False,
-) -> None:
-    """
-    Use in conjunction with unite_polygons_to_binned_multipolygon_dict()
-    """
-    kml = simplekml.Kml()
-    multipolodd = kml.newmultigeometry(name="MultiPoly")
-    for bin in bins:
-        if bin.enum in ignore_bin:
-            continue
-        for polygon in binned_multipolygon_dict[bin.enum].geoms:
-            pol = multipolodd.newpolygon(
-                name="polygon",
-                outerboundaryis=list(polygon.exterior.coords),
-            )
-            pol.style.polystyle.color = bin.colour
-            pol.style.polystyle.outline = 0
-        if one_file_per_bin:
-            _save_kml(kml=kml, file_name=file_name + "_bin_" + str(bin.enum))
-    if not one_file_per_bin:
-        _save_kml(kml=kml, file_name=file_name)
-
-
 ### Algorithm
 def run_interpolation(
     *,
@@ -530,8 +513,8 @@ def run_interpolation(
     # Below are associated with GdalOptions
     output_format: str = "Gtiff",
     output_type="Byte",
-    width: int = 0,
-    height: int = 0,
+    dataset_width: int = 0,
+    dataset_height: int = 0,
     z_increase=None,
     z_multiply=None,
     outputBounds: list = None,
@@ -557,8 +540,8 @@ def run_interpolation(
         output_tif_name ---
         output_format --- output format ("GTiff", etc...)
         output_type --- output type (gdalconst.GDT_Byte, etc...)
-        width --- width of the output raster in pixel
-        height --- height of the output raster in pixel
+        dataset_width --- dataset_width of the output raster in pixel
+        dataset_height --- dataset_height of the output raster in pixel
         output_res --- resolution of output file
         outputBounds --- assigned output bounds: [ulx, uly, lrx, lry]
 
@@ -613,19 +596,15 @@ def run_interpolation(
         s += f"nodata={nodata}:" if nodata else ""
         return s
 
-    # Not implemented settings include: creationOptions, layers
     new_options = []
     if output_format is not None:
         new_options += ["-of", output_format]
     if output_type is not None:
         new_options += ["-ot", output_type]
-    if width != 0 or height != 0:
-        new_options += ["-outsize", str(width), str(height)]
+    if dataset_width != 0 or dataset_height != 0:
+        new_options += ["-outsize", str(dataset_width), str(dataset_height)]
     if outputBounds is not None:
         new_options += ["-txe"] + _get_output_bounds()
-    # Maybe include outputSRS later?
-    # if outputSRS is not None:
-    #     new_options += ['-a_srs', str(outputSRS)]
     if algorithm is not None:
         new_options += ["-a", _get_algorithm_str()]
     if target_column is not None:
