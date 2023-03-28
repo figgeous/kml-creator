@@ -1,0 +1,7 @@
+import yaml
+
+with open('settings.yaml','r') as file:
+   contents = yaml.safe_load(file)
+   print(contents)
+   print(type(contents))
+    

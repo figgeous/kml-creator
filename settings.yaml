@@ -1,0 +1,12 @@
+Settings:
+-   setting1: Get information about the program (commands available, what to do to process the dataset, etc.)
+    code: placeholder1
+-   setting2: Bins modification
+    code: placeholder2
+-   setting3: Change dataset's size, range of values that can be discarded, etc.
+    code: placeholder3
+-   setting4: Bins modification
+    code: placeholder4
+-   setting5: Display information about the csv/kml files (Number of columns, amount of polygons)
+    code: placeholder5
+
