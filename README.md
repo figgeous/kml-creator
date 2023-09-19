@@ -7,7 +7,7 @@
 - Allows users to create separate layers, each with its own color and opacity, corresponding to specific value ranges in given dataset columns.
 - Customize GDAL's algorithm settings via the GUI to define the search ellipsis's horizontal and vertical extents and set the degree of smoothing/simplification.
 
-![KML_Creator_screenshot](https://github.com/figgeous/kml-creator/assets/56649407/ae80254e-1b39-476a-ba92-01d4476d681f)
+![KML_Creator_screenshot](https://github.com/figgeous/kml-creator/assets/56649407/792a230c-9a49-431f-b76f-52d31f3782b1)
 
 ## Sample Output:
 
