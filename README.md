@@ -22,8 +22,5 @@ See a [sample output](https://www.google.com/maps/d/edit?mid=1k_8PufWkvy9zPsLz70
 1. Install the necessary packages:
 2. pip install -r requirements.txt
 3. Run the application: python __make__.py
-   
-## Contact & Collaboration:
-Interested in collaborating or have questions? Drop an email at [thomas.oneill@gmail.com](mailto:thomas.oneill@gmail.com).
 
 
